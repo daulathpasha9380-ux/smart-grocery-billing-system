@@ -1,0 +1,10 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "sh mvnw -DskipTests clean package"
+
+[deploy]
+startCommand = "java -Dserver.port=$PORT -Dspring.profiles.active=prod -jar target/billing-system-0.0.1-SNAPSHOT.jar"
+healthcheckPath = "/login"
+healthcheckTimeout = 180
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

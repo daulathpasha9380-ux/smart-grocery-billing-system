@@ -38,7 +38,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ProductRecognitionService {
 
-    private static final long MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
+    private static final long MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
 
     public record RecognitionResult(
             boolean success,
@@ -537,7 +537,7 @@ public class ProductRecognitionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please upload a photo of the product.");
         }
         if (file.getSize() > MAX_PHOTO_BYTES) {
-            throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Photo must be 10 MB or smaller.");
+            throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Photo must be 5 MB or smaller.");
         }
         String contentType = file.getContentType();
         if (contentType != null && !contentType.isBlank()) {

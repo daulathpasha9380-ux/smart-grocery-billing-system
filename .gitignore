@@ -43,5 +43,21 @@ application-local.properties
 *.mv.db
 *.trace.db
 *.log
+*.dump
+*.dumpstream
+*.sql.bak
 product-images/
 uploads/
+backups/
+backup/
+scratch/
+
+# OS and shell artifacts
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+*.tmp
+*.bak
+*.swp
+*~
+ersdaulath*

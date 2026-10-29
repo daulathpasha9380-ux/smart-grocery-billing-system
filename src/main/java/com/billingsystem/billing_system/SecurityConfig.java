@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/owner/**").hasRole("OWNER")
                 .requestMatchers("/cashier/**").hasAnyRole("OWNER", "CASHIER")
                 .requestMatchers("/customer/**").hasRole("CUSTOMER")
+                .requestMatchers("/api/smart-cart/**").hasAnyRole("OWNER", "CASHIER", "CUSTOMER")
                 .requestMatchers(HttpMethod.GET, "/api/products").hasAnyRole("OWNER", "CASHIER", "CUSTOMER")
                 .requestMatchers("/api/customers").hasAnyRole("OWNER", "CASHIER")
                 .requestMatchers(HttpMethod.GET, "/api/sales/export").hasRole("OWNER")
