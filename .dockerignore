@@ -1,0 +1,51 @@
+# Git, IDE, and build metadata
+**/.git
+**/.gitignore
+**/.gitattributes
+**/.github
+**/.vscode
+**/.idea
+**/HELP.md
+**/README.md
+**/target
+**/build
+
+# Databases & local persistent files (prevent leaking local data)
+**/*.db
+**/*.mv.db
+**/*.trace.db
+**/*.sql.bak
+**/*.dump
+**/*.dumpstream
+
+# Backups and temporary scratch work
+**/backups
+**/backup
+**/scratch
+
+# User uploaded images and local files (do not leak customer or product images)
+**/product-images
+**/uploads
+
+# Environment secrets and credentials
+**/.env
+**/.env.*
+!**/.env.example
+**/application-local.properties
+**/*.pem
+**/*.key
+**/*.p12
+**/*.jks
+**/*.crt
+**/*.log
+
+# Operating system artifacts
+**/Thumbs.db
+**/[Dd]esktop.ini
+**/.DS_Store
+**/*.tmp
+**/*.bak
+**/*.swp
+**/*~
+**/ersdaulath*
+
