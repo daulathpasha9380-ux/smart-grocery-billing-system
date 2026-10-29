@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Metric Stat Card Fragment -->
+<div th:fragment="statCard(label, value, trend, isUp, icon, variant)" class="stat-card">
+    <div class="stat-header">
+        <span class="stat-label" th:text="${label}">Today's Sales</span>
+        <div class="stat-icon-wrapper" th:classappend="${variant}" th:text="${icon}">💰</div>
+    </div>
+    <div class="stat-value" th:text="${value}">₹0.00</div>
+    <div class="stat-trend" th:classappend="${isUp ? 'trend-up' : 'trend-down'}">
+        <span th:text="${isUp ? '↑' : '↓'}">↑</span>
+        <span th:text="${trend}">12% vs yesterday</span>
+    </div>
+</div>
+
+<!-- Confirmation Modal Fragment -->
+<div th:fragment="confirmModal" id="confirmModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="confirmModalTitle" class="modal-title">Confirm Action</h3>
+            <button id="closeModalBtn" class="modal-close-btn" aria-label="Close" type="button">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="confirmModalMessage" style="font-size:0.95rem;color:var(--text-secondary);line-height:1.6;">Are you sure you want to proceed?</p>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelModalBtn" class="btn btn-secondary" type="button">Cancel</button>
+            <button id="confirmModalBtn" class="btn btn-danger" type="button">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Product Modal Form Fragment -->
+<div th:fragment="productModal" id="productModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+    <div class="modal-card" style="max-width: 680px;">
+        <div class="modal-header">
+            <h3 id="productModalTitle" class="modal-title">📦 Add Product</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeProductModal()">&times;</button>
+        </div>
+        <form id="productForm" style="display:flex;flex-direction:column;flex:1;min-height:0;margin:0;">
+            <div class="modal-body">
+                <div class="form-section" style="padding:var(--space-md);margin-bottom:var(--space-md);">
+                    <div class="form-section-title">Product Information</div>
+                    <div style="display:flex;align-items:center;gap:14px;margin-bottom:var(--space-md);">
+                        <img id="productImagePreview" src="/images/products/placeholder.svg" alt="Product image preview"
+                             style="width:88px;height:88px;object-fit:contain;background:#f4f7f5;border-radius:12px;padding:6px;">
+                        <div style="flex:1;">
+                            <label class="form-label" for="productImageInput">Product image (PNG or JPEG, up to 5 MB)</label>
+                            <input id="productImageInput" class="form-control" name="productImage" type="file" accept="image/png,image/jpeg">
+                            <button id="removeProductImageBtn" class="btn btn-ghost" type="button" onclick="removeProductImageFromForm()" hidden>Use default image</button>
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label">Product Name <span class="required-star">*</span></label>
+                            <input class="form-control" name="name" required placeholder="e.g. Basmati Rice 5kg">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category <span class="required-star">*</span></label>
+                            <select class="form-control" name="category" required>
+                                <option value="Grocery">Grocery</option>
+                                <option value="Dairy">Dairy</option>
+                                <option value="Bakery">Bakery</option>
+                                <option value="Produce">Produce</option>
+                                <option value="Beverages">Beverages</option>
+                                <option value="Household">Household</option>
+                                <option value="Personal Care">Personal Care</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Brand</label>
+                            <input class="form-control" name="brand" placeholder="e.g. Fortune">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label">Barcode / SKU</label>
+                            <input class="form-control" name="barcode" placeholder="e.g. 890123456789">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section" style="padding:var(--space-md);margin-bottom:var(--space-md);">
+                    <div class="form-section-title">Pricing</div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Purchase Price (₹)</label>
+                            <input class="form-control" name="purchasePrice" type="number" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Selling Price (₹) <span class="required-star">*</span></label>
+                            <input class="form-control" name="sellingPrice" type="number" min="0" step="0.01" required placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section" style="padding:var(--space-md);margin-bottom:0;">
+                    <div class="form-section-title">Inventory</div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Opening Stock <span class="required-star">*</span></label>
+                            <input class="form-control" name="openingStock" type="number" min="0" required placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Minimum Stock Alert</label>
+                            <input class="form-control" name="minStock" type="number" min="0" placeholder="5">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeProductModal()">Cancel</button>
+                <button id="productFormSubmit" class="btn btn-primary" type="submit">Add Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Customer Modal Form Fragment -->
+<div th:fragment="customerModal" id="customerModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Customer</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeCustomerModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="customerForm">
+                <div class="form-group">
+                    <label class="form-label">Customer Name <span class="required-star">*</span></label>
+                    <input class="form-control" name="name" required placeholder="e.g. Anish Sharma">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number <span class="required-star">*</span></label>
+                    <input class="form-control" name="phone" required placeholder="e.g. +91 98765 43210">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input class="form-control" type="email" name="email" placeholder="e.g. customer@gmail.com">
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Initial Loyalty Points</label>
+                        <input class="form-control" type="number" name="points" value="50" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Opening Store Credit (₹)</label>
+                        <input class="form-control" type="number" name="credit" value="0.00" step="0.01" min="0">
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding-top:var(--space-md);padding-bottom:0;background:transparent;border:none;">
+                    <button class="btn btn-secondary" type="button" onclick="closeCustomerModal()">Cancel</button>
+                    <button class="btn btn-primary" type="submit">Save Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Modal Form Fragment -->
+<div th:fragment="supplierModal" id="supplierModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Supplier</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeSupplierModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="supplierForm">
+                <div class="form-group">
+                    <label class="form-label">Company Name <span class="required-star">*</span></label>
+                    <input class="form-control" name="company" required placeholder="e.g. National FMCG Wholesalers">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contact Person Name <span class="required-star">*</span></label>
+                    <input class="form-control" name="contactPerson" required placeholder="e.g. Rajesh Kumar">
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Phone Number <span class="required-star">*</span></label>
+                        <input class="form-control" name="phone" required placeholder="+91 98000 11122">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" name="category">
+                            <option value="Grocery Staples">Grocery Staples</option>
+                            <option value="Dairy & Beverages">Dairy & Beverages</option>
+                            <option value="Produce">Produce</option>
+                            <option value="Household">Household</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding-top:var(--space-md);padding-bottom:0;background:transparent;border:none;">
+                    <button class="btn btn-secondary" type="button" onclick="closeSupplierModal()">Cancel</button>
+                    <button class="btn btn-primary" type="submit">Save Supplier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- UPI Payment Modal Fragment -->
+<div th:fragment="upiModal" id="upiModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">⚡ Pay via UPI / PhonePe / GPay</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeUpiModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+            <div style="font-size:0.9rem;color:var(--text-muted);margin-bottom:4px;">Scan QR Code or Open UPI App</div>
+            <div id="upiAmountDisplay" style="font-size:2.2rem;font-weight:800;color:var(--primary);margin-bottom:var(--space-md);">₹0.00</div>
+
+            <!-- Dynamic QR Code Container -->
+            <div style="background:#ffffff;border:2px dashed var(--primary-border);border-radius:var(--radius-md);padding:16px;display:inline-block;margin-bottom:var(--space-md);">
+                <img id="upiQrImage" src="" alt="UPI QR Code" style="width:200px;height:200px;display:block;margin:0 auto;" />
+                <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-top:8px;">UPI ID: freshledger@upi</div>
+            </div>
+
+            <div style="display:flex;gap:var(--space-xs);justify-content:center;margin-bottom:var(--space-md);">
+                <a id="btnPhonePeDeepLink" href="#" target="_blank" class="btn btn-primary" style="background:#5f259f;border-color:#5f259f;flex:1;text-decoration:none;">
+                    📱 Open PhonePe
+                </a>
+                <a id="btnGPayDeepLink" href="#" target="_blank" class="btn btn-primary" style="background:#4285f4;border-color:#4285f4;flex:1;text-decoration:none;">
+                    🌐 Open GPay
+                </a>
+            </div>
+
+            <p style="font-size:0.8rem;color:var(--text-muted);">Once payment is received, click below to complete order & send WhatsApp bill.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeUpiModal()">Cancel</button>
+            <button id="btnConfirmUpiSuccess" class="btn btn-primary" type="button">✔ Confirm Payment & Send Bill</button>
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Receipt Modal Fragment -->
+<div th:fragment="whatsAppModal" id="whatsAppModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header" style="background:#128c7e;color:white;">
+            <h3 class="modal-title" style="color:white;">📱 Send Bill to WhatsApp</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" style="color:white;" onclick="closeWhatsAppModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Customer WhatsApp Phone Number <span class="required-star">*</span></label>
+                <input id="whatsappPhoneInput" class="form-control" placeholder="e.g. 9876543210 or +91 98765 43210" required />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Pre-filled Bill Message Preview</label>
+                <textarea id="whatsappPreviewText" class="form-control" rows="8" readonly style="font-family:monospace;font-size:0.82rem;background:var(--bg-app);line-height:1.4;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer" style="gap:8px;">
+            <button class="btn btn-secondary" type="button" onclick="closeWhatsAppModal()">Cancel</button>
+            <button id="btnOpenWhatsApp" class="btn btn-primary" type="button" style="background:#25d366;border-color:#25d366;font-weight:700;flex:1;">
+                📱 Open WhatsApp Direct
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Explain My Bill Modal Fragment -->
+<div th:fragment="explainBillModal" id="explainBillModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 640px;">
+        <div class="modal-header">
+            <h3 class="modal-title">💡 Bill Completed Summary</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeExplainBillModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="explainBillContent">
+            <!-- Dynamically populated by JS -->
+        </div>
+        <div class="modal-footer" style="gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" type="button" onclick="closeExplainBillModal()">Close</button>
+            <button id="btnExplainBillPrintPdf" class="btn btn-secondary" type="button">🖨 Print Bill</button>
+            <button id="btnExplainBillDirectWhatsApp" class="btn btn-primary" type="button" style="background:#25d366;border-color:#25d366;font-weight:700;">
+                📱 Send Bill to WhatsApp
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cashier Shift Management Modal Fragment -->
+<div th:fragment="shiftModal" id="shiftModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 class="modal-title">💵 Cashier Shift Management</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeShiftModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section" style="padding:var(--space-md);margin-bottom:var(--space-md);">
+                <div class="form-section-title">Current Active Shift</div>
+                <div class="form-grid-2" style="font-size:0.9rem;">
+                    <div>Cashier: <strong>Cashier 1 (Owner)</strong></div>
+                    <div>Counter ID: <strong>Counter #01</strong></div>
+                    <div>Opening Cash: <strong>₹5,000.00</strong></div>
+                    <div>Shift Sales (Cash): <strong id="shiftCashSales">₹0.00</strong></div>
+                    <div>Shift Sales (UPI/Card): <strong id="shiftDigitalSales">₹0.00</strong></div>
+                    <div>Expected Cash in Drawer: <strong id="shiftExpectedCash" style="color:var(--primary);">₹5,000.00</strong></div>
+                </div>
+            </div>
+
+            <form id="shiftCloseForm">
+                <div class="form-group">
+                    <label class="form-label">Actual Cash Counted in Drawer (₹) <span class="required-star">*</span></label>
+                    <input id="actualCashInput" class="form-control" type="number" step="0.01" required placeholder="e.g. 5000.00" oninput="calculateShiftDifference()" />
+                </div>
+                <div id="shiftDifferenceDisplay" style="font-weight:700;margin-bottom:var(--space-md);padding:8px 12px;border-radius:var(--radius-md);display:none;"></div>
+                <div class="form-group">
+                    <label class="form-label">Closing Notes / Discrepancy Reason</label>
+                    <textarea id="shiftNotesInput" class="form-control" rows="2" placeholder="e.g. Minor cash change discrepancy of ₹20..."></textarea>
+                </div>
+                <div class="modal-footer" style="padding:0;background:transparent;border:none;">
+                    <button class="btn btn-secondary" type="button" onclick="closeShiftModal()">Keep Shift Open</button>
+                    <button class="btn btn-danger" type="submit">🔒 Reconcile & Close Shift</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Product Photo Barcode Matcher Modal Fragment -->
+<div th:fragment="receiptScannerModal" id="receiptScannerModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 620px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Find Product From Photo</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeReceiptScannerModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="border:2px dashed var(--border-subtle);padding:var(--space-xl);text-align:center;border-radius:var(--radius-md);background:var(--bg-app);margin-bottom:var(--space-md);">
+                <div style="font-size:2.5rem;margin-bottom:8px;">📄</div>
+                <div style="font-weight:700;margin-bottom:4px;">Upload or capture a product barcode</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-md);">Only an exact barcode match in the store catalog can be offered to your cart.</div>
+                <input type="file" id="receiptFileInput" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" onchange="simulateReceiptScan(event)" />
+            </div>
+            <div id="receiptScanResults" aria-live="polite" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeReceiptScannerModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Voice Smart Cart Modal Fragment -->
+<div th:fragment="voiceBillingModal" id="voiceBillingModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Voice Smart Cart</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeVoiceBillingModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+            <div id="voiceStatusText" role="status" aria-live="polite" style="font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:var(--space-md);">Speak a catalog command or type one below.</div>
+            <div style="margin:var(--space-md) 0;">
+                <button id="btnMicTrigger" class="btn btn-primary" type="button" aria-label="Start voice recognition" aria-pressed="false" title="Start voice recognition" onclick="toggleVoiceRecording()">
+                    🎙️ Speak
+                </button>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-md);">
+                Try “add two packets of milk”, “search for rice”, or “show my cart”.<br>
+                Speech uses your browser recognition service. Audio is not recorded by FreshLedger.
+            </div>
+
+            <div class="form-group" style="text-align:left;">
+                <label class="form-label" for="voiceTranscriptInput">Spoken or typed command</label>
+                <input id="voiceTranscriptInput" class="form-control" autocomplete="off" placeholder="Add two packets of milk" />
+            </div>
+            <div id="voiceCommandResults" style="display:flex;flex-direction:column;gap:8px;text-align:left;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeVoiceBillingModal()">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="processVoiceTranscriptToCart()">Run command</button>
+        </div>
+    </div>
+</div>
+
+<!-- Waste Entry Modal Fragment -->
+<div th:fragment="wasteModal" id="wasteModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header">
+            <h3 class="modal-title">🗑️ Record Waste / Damaged Stock</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeWasteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="wasteForm">
+                <div class="form-group">
+                    <label class="form-label">Select Product <span class="required-star">*</span></label>
+                    <select id="wasteProductSelect" class="form-control" required></select>
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Wasted Quantity <span class="required-star">*</span></label>
+                        <input class="form-control" type="number" name="quantity" min="1" required value="1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Waste Reason <span class="required-star">*</span></label>
+                        <select class="form-control" name="reason" required>
+                            <option value="Expired">Expired</option>
+                            <option value="Damaged">Damaged</option>
+                            <option value="Broken">Broken</option>
+                            <option value="Lost">Lost</option>
+                            <option value="Returned">Returned Unsellable</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes / Remarks</label>
+                    <input class="form-control" name="notes" placeholder="e.g. Package damaged during unloading..." />
+                </div>
+
+                <div class="modal-footer" style="padding:0;background:transparent;border:none;">
+                    <button class="btn btn-secondary" type="button" onclick="closeWasteModal()">Cancel</button>
+                    <button class="btn btn-danger" type="submit">Record Waste & Deduct Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Empty State Fragment -->
+<div th:fragment="emptyState(icon, title, desc, actionText)" class="empty-state">
+    <div class="empty-state-icon" th:text="${icon}">📦</div>
+    <div class="empty-state-title" th:text="${title}">No Items Found</div>
+    <div class="empty-state-desc" th:text="${desc}">There are currently no items available in this section.</div>
+    <button th:if="${actionText != null}" class="btn btn-primary" th:text="${actionText}">+ Add Item</button>
+</div>
+
+</body>
+</html>

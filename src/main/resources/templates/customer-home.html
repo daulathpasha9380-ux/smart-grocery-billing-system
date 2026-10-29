@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <title th:text="${pageTitle} + ' | FreshLedger'">Customer Home | FreshLedger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/design-system.css}" />
+    <style>
+        body{margin:0;background:#f5f8f7;font-family:'Plus Jakarta Sans',sans-serif;color:#14231b;}
+        .customer-shell{max-width:1320px;margin:0 auto;padding:20px;}
+        .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 20px;border-radius:20px;background:#fff;box-shadow:0 12px 25px rgba(10,25,18,.04);margin-bottom:20px;}
+        .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.4rem;}
+        .brand-badge{width:38px;height:38px;border-radius:12px;background:#d9e86e;color:#102b1e;display:flex;align-items:center;justify-content:center;font-weight:900;}
+        .nav{display:flex;gap:12px;flex-wrap:wrap;}
+        .nav a{padding:10px 14px;text-decoration:none;border-radius:12px;background:#f0f5f2;color:#17372d;font-weight:700;}
+        .nav button{padding:10px 14px;border:0;border-radius:12px;background:#f0f5f2;color:#17372d;font:inherit;font-weight:700;cursor:pointer;}
+        .nav a.active{background:#0d5d3b;color:#fff;}
+        .hero{display:flex;justify-content:space-between;align-items:center;gap:20px;background:linear-gradient(135deg,#0e3f2e,#1a7a52);color:#fff;border-radius:26px;padding:26px;box-shadow:0 18px 30px rgba(11,44,32,.18);margin-bottom:20px;}
+        .hero h1{font-size:2.3rem;margin:0 0 8px;}
+        .search{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+        .search input{min-width:260px;padding:14px 18px;border:none;border-radius:12px;}
+        .section{margin-top:20px;}
+        .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+        .product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;}
+        .product-card{background:#fff;border:1px solid #e5ece7;border-radius:18px;padding:16px;box-shadow:0 8px 18px rgba(10,23,17,.03);}
+        .product-img{height:140px;border-radius:14px;background:linear-gradient(135deg,#edf6f1,#d9eee0);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+        .product-img img{width:100%;height:100%;object-fit:contain;padding:10px;box-sizing:border-box;}
+        .customer-cart-image{width:40px;height:40px;flex:0 0 40px;object-fit:contain;border-radius:8px;background:#f4f7f5;padding:3px;}
+        .price{font-size:1.5rem;font-weight:800;color:#0d5d3b;margin:12px 0 6px;}
+        .pill{display:inline-flex;padding:6px 10px;font-size:.72rem;border-radius:999px;font-weight:800;background:#edf5f2;color:#123b2d;}
+        .cart-panel{background:#fff;border:1px solid #e5ece7;border-radius:18px;padding:18px;box-shadow:0 8px 18px rgba(10,23,17,.03);margin-top:18px;}
+        .btn{padding:12px 16px;border:none;border-radius:12px;font-weight:800;cursor:pointer;}
+        .btn-primary{background:#0d5d3b;color:#fff;}
+        .btn-secondary{background:#edf5f2;color:#143d30;border:1px solid #dfeae4;}
+        @media (max-width: 768px){.hero{flex-direction:column;align-items:flex-start;}.search input{min-width:100%;}}
+    </style>
+</head>
+<body>
+<div class="customer-shell">
+    <header class="topbar">
+        <div class="brand"><span class="brand-badge">+</span><span>FreshLedger</span></div>
+        <nav class="nav">
+            <a class="active" href="/customer/home">Home</a>
+            <a href="/customer/shop">Shop</a>
+            <a href="/customer/cart">Cart</a>
+            <a href="/customer/orders">My Orders</a>
+            <a href="/customer/bills">My Bills</a>
+            <a href="/customer/loyalty">Loyalty</a>
+            <a href="/customer/profile">Profile</a>
+            <form th:action="@{/logout}" method="post" style="margin:0;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button type="submit">Logout</button>
+            </form>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div>
+            <div id="customerWelcome" style="font-size:.76rem;letter-spacing:.08em;opacity:.8;">Welcome back</div>
+            <h1>Smart Grocery Shopping</h1>
+            <p style="margin:0;max-width:520px;opacity:.9;">Browse available products, manage your cart, and place an order.</p>
+        </div>
+        <div class="search">
+            <input id="customerSearchInput" type="text" placeholder="Search products, brands, categories" aria-label="Search products" />
+            <button id="customerSearchBtn" class="btn btn-primary" type="button">Search</button>
+            <button class="btn btn-secondary" type="button" onclick="openVoiceBillingModal()" aria-label="Open voice smart cart">🎙️ Voice Cart</button>
+            <button class="btn btn-secondary" type="button" onclick="openReceiptScannerModal()" aria-label="Find product from photo">📷 Photo</button>
+        </div>
+    </section>
+
+    <section id="customerCatalogSection" class="section">
+        <div class="section-head"><h2 style="margin:0;">Popular products</h2><span class="pill">Trending this week</span></div>
+        <div id="customerProductsGrid" class="product-grid">
+            <div class="product-card" data-product-name="Amul Taaza Milk 1L" data-product-price="32">
+                <div class="product-img"><img src="/images/products/dairy.svg" alt="Milk" loading="lazy"></div>
+                <h3>Amul Taaza Milk 1L</h3>
+                <div class="price">₹32</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="pill">In stock</span>
+                    <button class="btn btn-primary add-to-cart-btn" type="button">Add</button>
+                </div>
+            </div>
+            <div class="product-card" data-product-name="Basmati Rice 5kg" data-product-price="450">
+                <div class="product-img"><img src="/images/products/rice.svg" alt="Rice" loading="lazy"></div>
+                <h3>Basmati Rice 5kg</h3>
+                <div class="price">₹450</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="pill">Popular</span>
+                    <button class="btn btn-primary add-to-cart-btn" type="button">Add</button>
+                </div>
+            </div>
+            <div class="product-card" data-product-name="Harvest Gold Bread" data-product-price="45">
+                <div class="product-img"><img src="/images/products/bread.svg" alt="Bread" loading="lazy"></div>
+                <h3>Harvest Gold Bread</h3>
+                <div class="price">₹45</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="pill">Fresh</span>
+                    <button class="btn btn-primary add-to-cart-btn" type="button">Add</button>
+                </div>
+            </div>
+            <div class="product-card" data-product-name="Fresh Tomatoes 1kg" data-product-price="38">
+                <div class="product-img"><img src="/images/products/tomatoes.svg" alt="Tomatoes" loading="lazy"></div>
+                <h3>Fresh Tomatoes 1kg</h3>
+                <div class="price">₹38</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="pill">Farm fresh</span>
+                    <button class="btn btn-primary add-to-cart-btn" type="button">Add</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cart-panel">
+        <div class="section-head"><h2 style="margin:0;">My Cart</h2></div>
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div><strong>Cart subtotal:</strong> <span id="customerCartTotal">₹0.00</span></div>
+            <button id="customerCheckoutBtn" class="btn btn-primary" type="button">Place order</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
+            <label for="customerPointsToRedeem"><strong>Redeem points</strong> (<span id="customerAvailablePoints">0</span> available)</label>
+            <input id="customerPointsToRedeem" class="search-box" type="number" min="0" step="1" value="0" style="width:130px;min-width:100px;padding:8px 10px;" />
+            <span id="customerPointValue" style="color:#60756a;"></span>
+        </div>
+        <p id="customerOrderFeedback" role="status" aria-live="polite"></p>
+        <div id="customerCartItems" aria-live="polite"></div>
+    </section>
+
+    <section id="customerOrdersSection" class="section" hidden>
+        <div class="section-head"><h2 style="margin:0;">My Orders</h2></div>
+        <div id="customerOrdersList" class="product-grid"></div>
+    </section>
+
+    <section id="customerBillsSection" class="section" hidden>
+        <div class="section-head"><h2 style="margin:0;">My Bills</h2></div>
+        <div id="customerBillsList" class="product-grid"></div>
+    </section>
+
+    <section id="customerLoyaltySection" class="section" hidden>
+        <div class="section-head"><h2 style="margin:0;">Loyalty</h2></div>
+        <div class="product-grid">
+            <div class="product-card"><h3>Loyalty Points</h3><div id="customerLoyaltyPoints" class="price">Loading…</div><p id="customerLoyaltyRule" style="color:#60756a;margin:0;"></p></div>
+        </div>
+        <div id="customerLoyaltyHistory" style="display:flex;flex-direction:column;gap:8px;margin-top:16px;"></div>
+    </section>
+
+    <section id="customerProfileSection" class="section" hidden>
+        <div class="section-head"><h2 style="margin:0;">Profile</h2></div>
+        <div class="product-card">
+            <h3 id="customerProfileName">Loading profile…</h3>
+            <p id="customerProfileEmail"></p>
+            <p id="customerProfilePhone"></p>
+        </div>
+    </section>
+</div>
+
+<div th:replace="~{fragments/components :: voiceBillingModal}"></div>
+<div th:replace="~{fragments/components :: receiptScannerModal}"></div>
+
+<script>
+    const cartMap = new Map();
+    try {
+        const savedCart = JSON.parse(sessionStorage.getItem('customerCart') || '[]');
+        if (Array.isArray(savedCart)) {
+            savedCart.forEach(item => {
+                if (Number.isSafeInteger(item.id) && item.id > 0 && Number.isFinite(item.price)
+                    && Number.isSafeInteger(item.qty) && item.qty > 0) {
+                    cartMap.set(item.id, item);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Saved cart could not be restored.', error);
+        sessionStorage.removeItem('customerCart');
+    }
+
+    const formatMoney = (value) => `₹${Number(value).toFixed(2)}`;
+    let customerProducts = [];
+    let customerLoyaltyBalance = 0;
+    let customerPointValue = 1;
+
+    function customerProductImage(product, className = '') {
+        const path = product && (product.imagePath || product.imagepath);
+        const image = document.createElement('img');
+        image.className = className;
+        image.src = typeof path === 'string'
+            && (path.startsWith('/images/products/') || path.startsWith('/product-images/'))
+            ? path : '/images/products/placeholder.svg';
+        image.alt = product?.name ? `${product.name} image` : '';
+        image.loading = 'lazy';
+        image.onerror = () => {
+            image.onerror = null;
+            image.src = '/images/products/placeholder.svg';
+        };
+        return image;
+    }
+
+    async function customerApi(url, options = {}) {
+        const headers = new Headers(options.headers || {});
+        if (options.body !== undefined) headers.set('Content-Type', 'application/json');
+        const csrf = document.querySelector('meta[name="_csrf"]')?.content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+        if (csrf && csrfHeader && options.method && options.method !== 'GET') headers.set(csrfHeader, csrf);
+        const response = await fetch(url, { ...options, headers });
+        if (!response.ok) {
+            let message = `Request failed (${response.status}).`;
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (error) {
+                if (!(error instanceof SyntaxError)) throw error;
+            }
+            throw new Error(message);
+        }
+        return response.status === 204 ? null : response.json();
+    }
+
+    function renderCustomerProducts(products) {
+        const grid = document.getElementById('customerProductsGrid');
+        grid.replaceChildren();
+        products.forEach((product) => {
+            const card = document.createElement('article');
+            card.className = 'product-card';
+            card.dataset.productName = product.name;
+            card.dataset.productPrice = product.price;
+            card.dataset.productId = product.id;
+            const imagePanel = document.createElement('div');
+            imagePanel.className = 'product-img';
+            imagePanel.append(customerProductImage(product));
+            const name = document.createElement('h3');
+            name.textContent = product.name;
+            const price = document.createElement('div');
+            price.className = 'price';
+            price.textContent = `₹${Number(product.price).toFixed(2)}`;
+            const stock = document.createElement('span');
+            stock.className = 'pill';
+            stock.textContent = product.stock > 0 ? `${product.stock} in stock` : 'Out of stock';
+            const add = document.createElement('button');
+            add.className = 'btn btn-primary add-to-cart-btn';
+            add.type = 'button';
+            add.textContent = 'Add';
+            add.disabled = product.stock <= 0;
+            add.addEventListener('click', () => {
+                const current = cartMap.get(product.id);
+                if (current && current.qty >= product.stock) {
+                    document.getElementById('customerOrderFeedback').textContent = 'There is not enough stock for another unit.';
+                    return;
+                }
+                cartMap.set(product.id, current
+                    ? { ...current, qty: current.qty + 1 }
+                    : { id: product.id, name: product.name, price: Number(product.price), stock: product.stock, imagePath: product.imagePath, qty: 1 });
+                updateCustomerCartSummary();
+            });
+            card.append(imagePanel, name, price, stock, add);
+            grid.append(card);
+        });
+    }
+
+    function renderCustomerOrders(orders) {
+        renderCustomerTransactions(document.getElementById('customerOrdersList'), orders, 'No orders yet.');
+    }
+
+    function renderCustomerBills(bills) {
+        renderCustomerTransactions(document.getElementById('customerBillsList'), bills, 'No bills are linked to this account.');
+    }
+
+    function renderCustomerTransactions(list, transactions, emptyMessage) {
+        list.replaceChildren();
+        transactions.forEach((order) => {
+            const card = document.createElement('article');
+            card.className = 'product-card';
+            const heading = document.createElement('h3');
+            heading.textContent = order.invoice;
+            const status = document.createElement('p');
+            status.textContent = `${order.status} • ${new Date(order.date).toLocaleString()}`;
+            const details = document.createElement('div');
+            details.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+            order.items.forEach(item => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                const product = customerProducts.find(candidate => candidate.id === item.productId)
+                    || { name: item.name };
+                row.append(customerProductImage(product, 'customer-cart-image'));
+                const label = document.createElement('span');
+                label.textContent = `${item.name} × ${item.quantity}`;
+                row.append(label);
+                details.append(row);
+            });
+            const amount = document.createElement('p');
+            amount.textContent = formatMoney(order.amount);
+            card.append(heading, status, details, amount);
+            list.append(card);
+        });
+        if (transactions.length === 0) list.textContent = emptyMessage;
+    }
+
+    function updateCustomerCartSummary() {
+        const total = Array.from(cartMap.values()).reduce((sum, item) => sum + item.price * item.qty, 0);
+        document.getElementById('customerCartTotal').textContent = formatMoney(total);
+        sessionStorage.setItem('customerCart', JSON.stringify(Array.from(cartMap.values())));
+        const items = document.getElementById('customerCartItems');
+        items.replaceChildren();
+        if (cartMap.size === 0) {
+            items.textContent = 'Your cart is empty.';
+            return;
+        }
+        cartMap.forEach(item => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '10px';
+            row.style.marginTop = '8px';
+            const product = customerProducts.find(candidate => candidate.id === item.id) || item;
+            row.append(customerProductImage(product, 'customer-cart-image'));
+            const label = document.createElement('span');
+            label.textContent = `${item.name} — ${formatMoney(item.price * item.qty)}`;
+            const decrease = document.createElement('button');
+            decrease.className = 'btn btn-secondary';
+            decrease.type = 'button';
+            decrease.textContent = '−';
+            decrease.setAttribute('aria-label', `Decrease ${item.name} quantity`);
+            decrease.addEventListener('click', () => {
+                if (item.qty === 1) cartMap.delete(item.id);
+                else cartMap.set(item.id, { ...item, qty: item.qty - 1 });
+                updateCustomerCartSummary();
+            });
+            const quantity = document.createElement('span');
+            quantity.textContent = String(item.qty);
+            const increase = document.createElement('button');
+            increase.className = 'btn btn-secondary';
+            increase.type = 'button';
+            increase.textContent = '+';
+            increase.setAttribute('aria-label', `Increase ${item.name} quantity`);
+            increase.disabled = Number.isInteger(item.stock) && item.qty >= item.stock;
+            increase.addEventListener('click', () => {
+                if (!Number.isInteger(item.stock) || item.qty >= item.stock) return;
+                cartMap.set(item.id, { ...item, qty: item.qty + 1 });
+                updateCustomerCartSummary();
+            });
+            row.append(label, decrease, quantity, increase);
+            items.append(row);
+        });
+    }
+
+    function renderCustomerLoyalty(ledger) {
+        customerLoyaltyBalance = ledger.balance;
+        document.getElementById('customerLoyaltyPoints').textContent = ledger.balance.toLocaleString();
+        document.getElementById('customerAvailablePoints').textContent = ledger.balance.toLocaleString();
+        const history = document.getElementById('customerLoyaltyHistory');
+        history.replaceChildren();
+        if (ledger.entries.length === 0) {
+            history.textContent = 'No loyalty activity yet.';
+            return;
+        }
+        ledger.entries.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'product-card';
+            const description = document.createElement('strong');
+            description.textContent = entry.reason;
+            const amount = document.createElement('span');
+            amount.textContent = `${entry.pointsDelta > 0 ? '+' : ''}${entry.pointsDelta} points`;
+            const date = document.createElement('time');
+            date.dateTime = entry.date;
+            date.textContent = new Date(entry.date).toLocaleString();
+            row.append(description, amount, date);
+            history.append(row);
+        });
+    }
+
+    const customerSearchInput = document.getElementById('customerSearchInput');
+    const customerSearchBtn = document.getElementById('customerSearchBtn');
+
+    function filterCustomerProducts(term) {
+        const value = term.toLowerCase();
+        document.querySelectorAll('#customerProductsGrid .product-card').forEach((card) => {
+            const text = card.textContent.toLowerCase();
+            card.style.display = text.includes(value) ? '' : 'none';
+        });
+    }
+
+    customerSearchBtn.addEventListener('click', () => filterCustomerProducts(customerSearchInput.value));
+    customerSearchInput.addEventListener('input', (event) => filterCustomerProducts(event.target.value));
+
+    document.getElementById('customerCheckoutBtn').addEventListener('click', async () => {
+        const feedback = document.getElementById('customerOrderFeedback');
+        if (cartMap.size === 0) {
+            feedback.textContent = 'Add at least one product before placing an order.';
+            return;
+        }
+        try {
+            const redeemInput = document.getElementById('customerPointsToRedeem');
+            const pointsToRedeem = Number.parseInt(redeemInput.value || '0', 10);
+            if (!Number.isSafeInteger(pointsToRedeem) || pointsToRedeem < 0
+                || pointsToRedeem > customerLoyaltyBalance) {
+                feedback.textContent = 'Enter a valid number of points within your available balance.';
+                return;
+            }
+            const checkoutButton = document.getElementById('customerCheckoutBtn');
+            checkoutButton.disabled = true;
+            const order = await customerApi('/api/orders', {
+                method: 'POST',
+                body: JSON.stringify({
+                    operationId: crypto.randomUUID(),
+                    pointsToRedeem,
+                    items: Array.from(cartMap.values()).map(item => ({ productId: item.id, quantity: item.qty }))
+                })
+            });
+            cartMap.clear();
+            sessionStorage.removeItem('customerCart');
+            redeemInput.value = '0';
+            updateCustomerCartSummary();
+            feedback.textContent = `Order ${order.invoice} placed. Total: ${formatMoney(order.amount)}.`;
+            renderCustomerOrders(await customerApi('/api/orders'));
+            customerProducts = await customerApi('/api/products');
+            renderCustomerProducts(customerProducts);
+            renderCustomerLoyalty(await customerApi('/api/customer/loyalty'));
+        } catch (error) {
+            console.error('Customer order could not be placed.', error);
+            feedback.textContent = error.message;
+        } finally {
+            document.getElementById('customerCheckoutBtn').disabled = false;
+        }
+    });
+
+    async function initializeCustomerStore() {
+        const path = location.pathname;
+        const catalogPaths = ['/customer', '/customer/', '/customer/home', '/customer/shop', '/customer/products'];
+        document.getElementById('customerCatalogSection').hidden = !catalogPaths.includes(path);
+        document.querySelector('.cart-panel').hidden = !catalogPaths.includes(path) && path !== '/customer/cart';
+        document.getElementById('customerOrdersSection').hidden = path !== '/customer/orders';
+        document.getElementById('customerBillsSection').hidden = path !== '/customer/bills';
+        document.getElementById('customerLoyaltySection').hidden = path !== '/customer/loyalty';
+        document.getElementById('customerProfileSection').hidden = path !== '/customer/profile';
+
+        try {
+            const profile = await customerApi('/api/customer/profile');
+            document.getElementById('customerWelcome').textContent = `Welcome back, ${profile.name}`;
+            document.getElementById('customerLoyaltyPoints').textContent = profile.points.toLocaleString();
+            document.getElementById('customerProfileName').textContent = profile.name;
+            document.getElementById('customerProfileEmail').textContent = profile.email || 'No email on file';
+            document.getElementById('customerProfilePhone').textContent = profile.phone || 'No phone on file';
+
+            const loyaltyRules = await customerApi('/api/loyalty/rules');
+            customerPointValue = Number(loyaltyRules.valuePerPoint);
+            document.getElementById('customerPointValue').textContent = `1 point = ${formatMoney(customerPointValue)}.`;
+            document.getElementById('customerLoyaltyRule').textContent =
+                `Earn ${loyaltyRules.pointsPerHundred} point(s) per ₹100 eligible purchase.`;
+            renderCustomerLoyalty(await customerApi('/api/customer/loyalty'));
+
+            customerProducts = await customerApi('/api/products');
+            const byId = new Map(customerProducts.map(product => [product.id, product]));
+            cartMap.forEach((item, id) => {
+                const product = byId.get(id);
+                if (product) cartMap.set(id, {
+                    ...item, name: product.name, price: Number(product.price),
+                    stock: product.stock, imagePath: product.imagePath
+                });
+            });
+            if (catalogPaths.includes(path)) renderCustomerProducts(customerProducts);
+            if (catalogPaths.includes(path) || path === '/customer/cart') updateCustomerCartSummary();
+            if (path === '/customer/orders') renderCustomerOrders(await customerApi('/api/orders'));
+            if (path === '/customer/bills') renderCustomerBills(await customerApi('/api/customer/bills'));
+        } catch (error) {
+            console.error('Customer store data could not be loaded.', error);
+            document.getElementById('customerOrderFeedback').textContent = error.message;
+        }
+    }
+    initializeCustomerStore();
+</script>
+<script th:src="@{/js/app.js}" src="/js/app.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const reviewAlternatives = document.querySelector('.cart-panel .btn-secondary');
+        const buyAgain = Array.from(document.querySelectorAll('.product-card .btn-secondary')).find((btn) => btn.textContent.includes('Buy again'));
+
+        if (reviewAlternatives) {
+            reviewAlternatives.addEventListener('click', () => {
+                if (typeof showToast === 'function') {
+                    showToast('Cheaper Alternatives', 'A budget-friendly product list is available for this basket.', 'info');
+                }
+            });
+        }
+
+        if (buyAgain) {
+            buyAgain.addEventListener('click', () => {
+                if (typeof showToast === 'function') {
+                    showToast('Buy Again', 'Your recent essentials were added to your repeat order list.', 'success');
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>

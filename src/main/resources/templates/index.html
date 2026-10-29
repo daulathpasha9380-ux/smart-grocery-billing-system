@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Dashboard')}"></head>
+<body>
+<div class="app-layout">
+
+    <!-- Reusable Sidebar Navigation -->
+    <aside th:replace="~{fragments/sidebar :: sidebar(${activeView})}"></aside>
+
+    <!-- Main Workspace Area -->
+    <div class="main-wrapper">
+
+        <!-- Reusable Top Header Bar -->
+        <header th:replace="~{fragments/header :: header}"></header>
+
+        <!-- Dynamic Page Content -->
+        <main class="page-content">
+
+            <!-- Page Header Title Area -->
+            <div class="page-header">
+                <div>
+                    <h1 id="currentPageTitle" class="page-title" th:text="${activeView == 'billing' ? 'Point of Sale / Billing' : (activeView == 'products' ? 'Product Catalog' : 'Dashboard Overview')}">Dashboard Overview</h1>
+                    <p class="page-subtitle">Real-time grocery management, inventory tracking, customer billing & reports</p>
+                </div>
+                <div style="display:flex;gap:var(--space-xs);">
+                    <button class="btn btn-primary" type="button" onclick="openProductModal()">
+                        <span>+ Add Product</span>
+                    </button>
+                    <button class="btn btn-secondary" type="button" onclick="window.location.href='/pos'">
+                        <span>🛒 Open POS</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 1: DASHBOARD OVERVIEW ================= -->
+            <div id="dashboard-view" class="page-view" th:style="${activeView == 'dashboard' or activeView == null ? 'display:block;' : 'display:none;'}">
+
+                <!-- Top 6 Stat Metrics Cards -->
+                <section class="metrics-grid" aria-label="Today's Metrics">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Today's Sales</span>
+                            <div class="stat-icon-wrapper">💰</div>
+                        </div>
+                        <div class="stat-value">₹24,860.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> 12.8% vs yesterday</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Today's Profit</span>
+                            <div class="stat-icon-wrapper">📈</div>
+                        </div>
+                        <div class="stat-value">₹5,420.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> 21.8% margin</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Today's Bills</span>
+                            <div class="stat-icon-wrapper">🧾</div>
+                        </div>
+                        <div class="stat-value">86</div>
+                        <div class="stat-trend trend-up"><span>↑</span> 8.2% vs yesterday</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Inventory Valuation</span>
+                            <div class="stat-icon-wrapper">🏢</div>
+                        </div>
+                        <div class="stat-value">₹4,12,000.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> Total stock value</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Low Stock</span>
+                            <div class="stat-icon-wrapper warning">⚠️</div>
+                        </div>
+                        <div class="stat-value">12 items</div>
+                        <div class="stat-trend trend-down"><span>↓</span> Needs attention</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Expiring Risk</span>
+                            <div class="stat-icon-wrapper danger">⏰</div>
+                        </div>
+                        <div class="stat-value">3 items</div>
+                        <div class="stat-trend trend-down"><span>↓</span> Within 7 days</div>
+                    </div>
+                </section>
+
+                <!-- HERO SECTION: STORE HEALTH SCORE (Section 15) -->
+                <div class="card" style="background:linear-gradient(135deg, #0b4f33 0%, #107048 100%);color:white;margin-bottom:var(--space-md);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-md);">
+                        <div style="display:flex;align-items:center;gap:var(--space-md);">
+                            <div style="width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,0.15);border:3px solid rgba(255,255,255,0.3);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                                <div style="font-size:1.9rem;font-weight:900;line-height:1;">82</div>
+                                <div style="font-size:0.65rem;opacity:0.85;">OUT OF 100</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;opacity:0.85;font-weight:700;">STORE HEALTH SCORE</div>
+                                <h2 style="font-size:1.4rem;font-weight:800;color:white;margin:2px 0;">Strong Business Health</h2>
+                                <p style="font-size:0.84rem;opacity:0.9;margin:0;">Weighted business score calculated from sales, profit margins, dead stock & expiry risks.</p>
+                            </div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.12);padding:12px 16px;border-radius:var(--radius-md);backdrop-filter:blur(4px);min-width:240px;">
+                            <div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;opacity:0.9;">TOP RECOMMENDATION</div>
+                            <div style="font-size:0.88rem;font-weight:600;">"Reduce slow-moving inventory purchases to free ₹4,000 tied-up capital."</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:var(--space-xs);margin-top:var(--space-md);padding-top:var(--space-sm);border-top:1px solid rgba(255,255,255,0.15);font-size:0.82rem;">
+                        <div>Sales: <strong style="color:#6ee7b7;">Good (90/100)</strong></div>
+                        <div>Inventory: <strong style="color:#6ee7b7;">Good (85/100)</strong></div>
+                        <div>Expiry Risk: <strong style="color:#fde047;">Attention (70/100)</strong></div>
+                        <div>Dead Stock: <strong style="color:#fca5a5;">High Risk (65/100)</strong></div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Left Column: Smart Expiry Rescue, Purchase Planner & Sales Chart -->
+                    <div>
+                        <!-- Section 4: SMART EXPIRY RESCUE SYSTEM -->
+                        <div class="card" style="border-left:4px solid var(--warning);">
+                            <div class="card-header">
+                                <h2 class="card-title">🚨 Smart Expiry Rescue System</h2>
+                                <span class="badge badge-warning">Rule-Based Assistant</span>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:12px;">
+                                <div style="padding:12px;background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:var(--radius-md);">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                        <span style="display:flex;align-items:center;gap:8px;"><img src="/images/products/dairy.svg" alt="" loading="lazy" style="width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:3px;"><strong style="font-size:0.95rem;">Amul Taaza Milk 1L</strong></span>
+                                        <span class="badge badge-danger">Expires in 2 days</span>
+                                    </div>
+                                    <div style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:8px;">
+                                        Stock: <strong>18 units</strong> • Avg Daily Sales: <strong>3 units</strong> • Expected Sales: <strong>6 units</strong><br>
+                                        <span style="color:var(--danger);font-weight:700;">⚠️ 12 units may remain unsold before expiry.</span>
+                                    </div>
+                                    <div style="padding:8px 12px;background:white;border-radius:var(--radius-sm);margin-bottom:8px;font-size:0.82rem;color:var(--text-primary);border-left:3px solid var(--primary);">
+                                        <strong>Explainable Recommendation:</strong> "Consider a 10% discount to reduce potential waste."<br>
+                                        Potential Stock Waste: <strong>₹384.00</strong> • Potential Revenue Recovery: <strong>₹345.60</strong>
+                                    </div>
+                                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                                        <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.78rem;" type="button" onclick="showToast('Rescue Deferred', 'No discount applied. Stock monitored.', 'info')">Ignore</button>
+                                        <button class="btn btn-primary" style="padding:4px 10px;font-size:0.78rem;" type="button" onclick="showToast('10% Discount Approved!', 'Amul Taaza Milk price updated to ₹28.80 (10% OFF clearance).', 'success')">Approve 10% Discount</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 9: SMART PURCHASE PLANNER -->
+                        <div class="card" style="border-left:4px solid var(--primary);">
+                            <div class="card-header">
+                                <h2 class="card-title">📋 Smart Purchase Planner</h2>
+                                <button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:var(--primary);" type="button" onclick="showToast('Purchase Plan Drafted', 'Draft PO created for supplier approval.', 'success')">Draft Orders →</button>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-app);border-radius:var(--radius-md);">
+                                    <div>
+                                        <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.9rem;"><img src="/images/products/rice.svg" alt="" loading="lazy" style="width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:3px;">Basmati Rice 5kg → <span style="color:var(--primary);">Buy 20 units</span></div>
+                                        <div style="font-size:0.78rem;color:var(--text-muted);">Current stock may fall below minimum level within 3 days.</div>
+                                    </div>
+                                    <span class="badge badge-warning">Priority High</span>
+                                </div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-app);border-radius:var(--radius-md);">
+                                    <div>
+                                        <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.9rem;"><img src="/images/products/dairy.svg" alt="" loading="lazy" style="width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:3px;">Amul Taaza Milk 1L → <span style="color:var(--primary);">Buy 40 units</span></div>
+                                        <div style="font-size:0.78rem;color:var(--text-muted);">Daily velocity high (42 sold today). Lead time 1 day.</div>
+                                    </div>
+                                    <span class="badge badge-info">Routine Order</span>
+                                </div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-app);border-radius:var(--radius-md);">
+                                    <div>
+                                        <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.9rem;"><img src="/images/products/household.svg" alt="" loading="lazy" style="width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:3px;">Surf Excel Detergent → <span style="color:var(--danger);">Do Not Purchase</span></div>
+                                        <div style="font-size:0.78rem;color:var(--text-muted);">Stock sufficient (14 units) for next 18 days.</div>
+                                    </div>
+                                    <span class="badge badge-success">Stock OK</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Weekly Sales Overview -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Weekly Sales Overview</h2>
+                                <span class="badge badge-info">This Week</span>
+                            </div>
+                            <div style="display:flex;align-items:flex-end;gap:12px;height:180px;padding-top:20px;border-bottom:1px solid var(--border-subtle);">
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:45%;position:relative;" title="Mon: ₹14,200"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Mon</span></div>
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:65%;position:relative;" title="Tue: ₹18,900"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Tue</span></div>
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:55%;position:relative;" title="Wed: ₹16,400"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Wed</span></div>
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:80%;position:relative;" title="Thu: ₹22,100"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Thu</span></div>
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:70%;position:relative;" title="Fri: ₹19,800"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Fri</span></div>
+                                <div style="flex:1;background:#cce8d8;border-radius:6px 6px 0 0;height:90%;position:relative;" title="Sat: ₹26,500"><span style="position:absolute;top:-20px;font-size:0.75rem;width:100%;text-align:center;color:var(--text-muted);">Sat</span></div>
+                                <div style="flex:1;background:var(--primary);border-radius:6px 6px 0 0;height:95%;position:relative;" title="Today: ₹24,860"><span style="position:absolute;top:-20px;font-size:0.75rem;font-weight:700;width:100%;text-align:center;color:var(--primary);">Today</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Transactions -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Recent Transactions</h2>
+                                <a href="#sales" data-view="sales" class="btn btn-ghost" style="padding:4px 8px;font-size:0.82rem;">View All Sales →</a>
+                            </div>
+                            <div class="table-container" style="box-shadow:none;border:none;margin:0;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice #</th>
+                                            <th>Time</th>
+                                            <th>Customer</th>
+                                            <th>Payment</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>INV-1048</strong></td>
+                                            <td>Today, 10:42 AM</td>
+                                            <td>Rahul Sharma</td>
+                                            <td>Cash</td>
+                                            <td><strong>₹1,240.00</strong></td>
+                                            <td><span class="badge badge-success">Completed</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>INV-1047</strong></td>
+                                            <td>Today, 10:18 AM</td>
+                                            <td>Walk-in Retail</td>
+                                            <td>UPI / QR</td>
+                                            <td><strong>₹860.00</strong></td>
+                                            <td><span class="badge badge-success">Completed</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Dead Stock, Business Insights & Event Planner -->
+                    <div>
+                        <!-- Section 7 & 8: DEAD STOCK & WASTE TRACKER -->
+                        <div class="card" style="border-left:4px solid var(--danger);">
+                            <div class="card-header">
+                                <h2 class="card-title">📦 Dead Stock & Waste Tracker</h2>
+                                <button class="btn btn-ghost" style="padding:4px 8px;font-size:0.78rem;color:var(--danger);" onclick="openWasteModal()">+ Log Waste</button>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                                <div style="padding:10px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:var(--radius-md);">
+                                    <div style="font-size:0.84rem;color:var(--danger-dark);font-weight:700;">₹4,000 inventory tied up in slow-moving items</div>
+                                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">Parle-G Gold (Stock: 40, Monthly Sales: 5) → Class: <strong>Very Slow</strong></div>
+                                </div>
+                                <div style="padding:10px;background:var(--bg-app);border-radius:var(--radius-md);">
+                                    <div style="font-weight:700;font-size:0.84rem;">Monthly Waste Value: <span style="color:var(--danger);">₹5,100.00</span></div>
+                                    <div style="font-size:0.78rem;color:var(--text-muted);">Expired: ₹3,200 • Damaged: ₹1,100 • Lost: ₹800</div>
+                                    <div style="font-size:0.78rem;font-weight:600;color:var(--primary);margin-top:4px;">Top Waste Category: Dairy (62%)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 21: TODAY'S SMART BUSINESS INSIGHTS -->
+                        <div class="card" style="border-left:4px solid #3b82f6;">
+                            <div class="card-header">
+                                <h2 class="card-title">💡 Today's Smart Insights</h2>
+                                <span class="badge badge-info">Real Store Data</span>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:8px;font-size:0.84rem;">
+                                <div style="padding:8px 10px;background:#eff6ff;border-radius:var(--radius-sm);color:#1e40af;">
+                                    💡 <strong>Milk sales increased 18%</strong> compared with previous period.
+                                </div>
+                                <div style="padding:8px 10px;background:#fef3c7;border-radius:var(--radius-sm);color:#92400e;">
+                                    ⏰ <strong>12 products</strong> are approaching expiry this month.
+                                </div>
+                                <div style="padding:8px 10px;background:#f0fdf4;border-radius:var(--radius-sm);color:#166534;">
+                                    🚀 <strong>Rice & Staples</strong> is your fastest-growing category.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 22: FESTIVAL / EVENT INVENTORY PLANNER -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">🎉 Event & Festival Planner</h2>
+                            </div>
+                            <div style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:8px;">
+                                Select upcoming festival to view recommended stock preparation categories:
+                            </div>
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <select id="festivalPlannerSelect" class="form-control" onchange="renderFestivalPlan()">
+                                    <option value="Diwali">Diwali (Grand Festival)</option>
+                                    <option value="Eid">Eid al-Fitr</option>
+                                    <option value="Holi">Holi Festival</option>
+                                    <option value="Christmas">Christmas & New Year</option>
+                                </select>
+                            </div>
+                            <div id="festivalPlanResults" style="padding:10px;background:var(--bg-app);border-radius:var(--radius-md);font-size:0.82rem;">
+                                <strong>Suggested Preparation Categories for Diwali:</strong><br>
+                                • Sweets & Dry Fruits (+40% stock)<br>
+                                • Cooking Oil & Whole Wheat Flour (+30% stock)<br>
+                                • Snacks & Beverages (+25% stock)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 2: BILLING / POS ================= -->
+            <div id="billing-view" class="page-view" th:style="${activeView == 'billing' ? 'display:block;' : 'display:none;'}">
+                <div class="pos-container">
+                    <!-- Left: Catalog & Quick Add -->
+                    <div class="pos-catalog-panel">
+                        <div class="card" style="margin-bottom:var(--space-sm);padding:var(--space-sm) var(--space-md);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-xs);flex-wrap:wrap;">
+                                <div style="display:flex;align-items:center;gap:var(--space-xs);">
+                                    <span class="badge badge-info" style="font-weight:700;">Counter #01 - Main Terminal</span>
+                                    <button class="btn btn-ghost" type="button" style="padding:2px 8px;font-size:0.78rem;" onclick="openShiftModal()">💵 Cashier Shift</button>
+                                </div>
+                                <div style="display:flex;gap:var(--space-xs);">
+                                    <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.8rem;" onclick="openVoiceBillingModal()">🎤 Voice Billing</button>
+                                    <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.8rem;" onclick="openReceiptScannerModal()">📷 Product Photo</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:var(--space-md);">
+                            <div class="pos-search-bar">
+                                <input id="posProductSearch" class="form-control" placeholder="🔍 Search product name, barcode or category..." aria-label="Search POS Products">
+                            </div>
+                            <div class="category-filter-pills">
+                                <button class="pill-btn active" type="button">All Items</button>
+                                <button class="pill-btn" type="button">Dairy</button>
+                                <button class="pill-btn" type="button">Grocery</button>
+                                <button class="pill-btn" type="button">Bakery</button>
+                                <button class="pill-btn" type="button">Produce</button>
+                                <button class="pill-btn" type="button">Beverages</button>
+                            </div>
+                        </div>
+
+                        <div id="posProductGrid" class="pos-product-grid">
+                            <!-- Dynamic POS Catalog Product Cards -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Active Bill & Checkout Panel -->
+                    <div class="pos-cart-panel">
+                        <div class="card-header" style="margin-bottom:var(--space-sm);">
+                            <h2 class="card-title">Active Bill</h2>
+                            <button id="btnHeldBillsList" class="btn btn-ghost" style="padding:2px 6px;font-size:0.78rem;color:var(--warning);" type="button">⏸ Held (<span id="heldBillsCount">0</span>)</button>
+                        </div>
+
+                        <!-- Customer Selection & Loyalty Tier Banner -->
+                        <div class="form-group" style="margin-bottom:var(--space-sm);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                <label class="form-label">Customer Account</label>
+                                <button class="btn btn-ghost" type="button" style="padding:0;font-size:0.78rem;color:var(--primary);" onclick="openCustomerModal()">+ New Customer</button>
+                            </div>
+                            <select id="posCustomerSelect" class="form-control" onchange="onPosCustomerChange()">
+                                <!-- Dynamic Customers Dropdown -->
+                            </select>
+                            <label class="form-label" for="posPointsToRedeem" style="margin-top:8px;">Redeem points (<span id="posAvailablePoints">0</span> available)</label>
+                            <input id="posPointsToRedeem" class="form-control" type="number" min="0" step="1" value="0" disabled />
+                            <small id="posRedeemValue" style="color:var(--text-muted);">No points applied</small>
+                        </div>
+
+                        <!-- Section 10 & 11: Shopping Pattern & Frequently Bought Together Suggestion -->
+                        <div id="frequentlyBoughtBanner" style="padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius-sm);margin-bottom:var(--space-sm);font-size:0.78rem;color:#1e40af;display:none;">
+                            💡 <strong>Customer Pattern:</strong> Due for Milk / Bread.<br>
+                            <em>Frequently bought together: Bread + Amul Butter 100g</em>
+                        </div>
+
+                        <!-- Section 5: CUSTOMER BUDGET GUARDIAN -->
+                        <div class="form-group" style="margin-bottom:var(--space-sm);padding:8px;background:var(--bg-app);border-radius:var(--radius-md);border:1px solid var(--border-subtle);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                <label class="form-label" style="margin:0;font-size:0.8rem;font-weight:700;">🛡️ Customer Budget Guardian</label>
+                                <span id="budgetAlertBadge" class="badge badge-success" style="font-size:0.72rem;">On Budget</span>
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <input id="custBudgetInput" class="form-control" type="number" placeholder="Set Budget (e.g. ₹1000)" style="padding:4px 8px;font-size:0.82rem;" oninput="updateBudgetGuardian()" />
+                                <button class="btn btn-secondary" style="padding:4px 8px;font-size:0.75rem;" type="button" onclick="optimizeCartForBudget()">Optimize Cart</button>
+                            </div>
+                            <div id="budgetWarningText" style="font-size:0.76rem;color:var(--danger);font-weight:700;margin-top:4px;display:none;"></div>
+                        </div>
+
+                        <div id="posCartItems" class="cart-items-table">
+                            <!-- Dynamic Active Cart Item Rows -->
+                        </div>
+
+                        <div class="grand-total-banner">
+                            <div>
+                                <div class="total-label">Grand Total</div>
+                                <div style="font-size:0.78rem;color:var(--text-muted);">Subtotal - Discount + Tax</div>
+                            </div>
+                            <div id="posGrandTotal" class="total-amount">₹0.00</div>
+                            <div style="font-size:.78rem;color:var(--text-muted);">Points applied: <span id="posLoyaltyRedemption">₹0.00</span></div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:var(--space-md);">
+                            <label class="form-label">Payment Mode</label>
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+                                <label style="display:flex;align-items:center;gap:4px;font-size:0.84rem;"><input type="radio" name="payType" value="Cash" checked> Cash</label>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:0.84rem;"><input type="radio" name="payType" value="UPI/PhonePe"> ⚡ UPI / PhonePe</label>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:0.84rem;"><input type="radio" name="payType" value="Card"> Card</label>
+                            </div>
+                        </div>
+
+                        <div class="pos-action-buttons">
+                            <button id="btnCompletePayment" class="btn btn-primary btn-lg" type="button" style="grid-column: 1 / -1;">
+                                <span>✔ Complete Payment</span>
+                            </button>
+                            <button id="btnSendPosWhatsApp" class="btn btn-secondary" type="button" style="background:#128c7e;color:white;border-color:#128c7e;font-weight:700;">
+                                <span>💬 Send WhatsApp</span>
+                            </button>
+                            <button id="btnPrintInvoice" class="btn btn-secondary" type="button">
+                                <span>🖨 Print Invoice</span>
+                            </button>
+                            <button id="btnHoldBill" class="btn btn-secondary" type="button">
+                                <span>⏸ Hold Bill</span>
+                            </button>
+                            <button id="btnClearBill" class="btn btn-danger" type="button">
+                                <span>🗑 Clear Bill</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 3: PRODUCTS CATALOG ================= -->
+            <div id="products-view" class="page-view" th:style="${activeView == 'products' ? 'display:block;' : 'display:none;'}">
+                <div class="table-container">
+                    <div class="table-toolbar">
+                        <div class="header-search table-search">
+                            <span class="header-search-icon">🔍</span>
+                            <input type="text" placeholder="Search product name or barcode..." aria-label="Search Products Table">
+                        </div>
+                        <div style="display:flex;gap:var(--space-xs);">
+                            <button class="btn btn-primary" type="button" onclick="openProductModal()">+ Add Product</button>
+                        </div>
+                    </div>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Product & Barcode</th>
+                                <th>Category</th>
+                                <th>Brand</th>
+                                <th>Cost Price</th>
+                                <th>Selling Price</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            <!-- Dynamic Products Table Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 4: INVENTORY ================= -->
+            <div id="inventory-view" class="page-view" th:style="${activeView == 'inventory' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Stock Levels & Reorder Thresholds</h2>
+                        <button class="btn btn-primary" type="button" onclick="showToast('Inventory Audit', 'Stock audit report downloaded.', 'info')">Download Stock Report</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Item & Category</th>
+                                    <th>Shelf Location</th>
+                                    <th>Available Stock</th>
+                                    <th>Min Threshold</th>
+                                    <th>Status</th>
+                                    <th>Quick Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryTableBody">
+                                <!-- Dynamic Inventory Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 5: CUSTOMERS ================= -->
+            <div id="customers-view" class="page-view" th:style="${activeView == 'customers' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Customer Accounts & Loyalty Points</h2>
+                        <button class="btn btn-primary" type="button" onclick="openCustomerModal()">+ Add Customer</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer Name</th>
+                                    <th>Phone Number</th>
+                                    <th>Email</th>
+                                    <th>Loyalty Points</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody">
+                                <!-- Dynamic Customer Accounts -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 6: SUPPLIERS ================= -->
+            <div id="suppliers-view" class="page-view" th:style="${activeView == 'suppliers' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Suppliers & Wholesale Vendors</h2>
+                        <button class="btn btn-primary" type="button" onclick="openSupplierModal()">+ Add Supplier</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Supplier Company</th>
+                                    <th>Contact Person</th>
+                                    <th>Phone / Email</th>
+                                    <th>Category</th>
+                                    <th>Pending Orders</th>
+                                </tr>
+                            </thead>
+                            <tbody id="suppliersTableBody">
+                                <!-- Dynamic Suppliers -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 7: PURCHASES ================= -->
+            <div id="purchases-view" class="page-view" th:style="${activeView == 'purchases' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Purchase Orders & Inward Bills</h2>
+                        <button class="btn btn-primary" type="button" onclick="showToast('New Purchase Order', 'Purchase Order Creator opened', 'info')">+ Create Purchase Order</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>PO Number</th>
+                                    <th>Supplier</th>
+                                    <th>Order Date</th>
+                                    <th>Items</th>
+                                    <th>Total Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="purchasesTableBody">
+                                <!-- Dynamic Purchase Orders -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 8: SALES ================= -->
+            <div id="sales-view" class="page-view" th:style="${activeView == 'sales' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Sales History & Issued Invoices</h2>
+                        <button class="btn btn-secondary" type="button" onclick="showToast('Export Sales', 'Sales history exported to CSV', 'success')">Export to CSV</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date & Time</th>
+                                    <th>Customer</th>
+                                    <th>Payment Mode</th>
+                                    <th>Cashier</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesTableBody">
+                                <!-- Dynamic Sales Transactions -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 9: EXPENSES ================= -->
+            <div id="expenses-view" class="page-view" th:style="${activeView == 'expenses' ? 'display:block;' : 'display:none;'}">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Store Operating Expenses</h2>
+                        <button class="btn btn-primary" type="button" onclick="showToast('Log Expense', 'Expense Logger opened', 'info')">+ Log Expense</button>
+                    </div>
+                    <div class="table-container" style="margin:0;box-shadow:none;border:none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Category</th>
+                                    <th>Description</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensesTableBody">
+                                <!-- Dynamic Expenses -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 10: REPORTS ================= -->
+            <div id="reports-view" class="page-view" th:style="${activeView == 'reports' ? 'display:block;' : 'display:none;'}">
+                <div class="metrics-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Monthly Revenue</span>
+                            <div class="stat-icon-wrapper">💵</div>
+                        </div>
+                        <div class="stat-value">₹6,42,800.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> 14.2% vs last month</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Monthly Profit</span>
+                            <div class="stat-icon-wrapper">📊</div>
+                        </div>
+                        <div class="stat-value">₹1,28,500.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> 20.0% profit margin</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Tax Collected (GST)</span>
+                            <div class="stat-icon-wrapper">🏛️</div>
+                        </div>
+                        <div class="stat-value">₹38,560.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> CGST + SGST</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Inventory Valuation</span>
+                            <div class="stat-icon-wrapper">🏢</div>
+                        </div>
+                        <div class="stat-value">₹4,12,000.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> At cost price</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Avg Bill Value</span>
+                            <div class="stat-icon-wrapper">🛒</div>
+                        </div>
+                        <div class="stat-value">₹348.00</div>
+                        <div class="stat-trend trend-up"><span>↑</span> Based on 1,847 bills</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Category Revenue Breakdown</h2>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:var(--space-md);">
+                        <div style="padding:var(--space-md);background:var(--bg-app);border-radius:var(--radius-md);">
+                            <div style="font-weight:700;color:var(--text-secondary);">Grocery Staples</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin:4px 0;">₹2,84,000</div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);">44.2% of total sales</div>
+                        </div>
+                        <div style="padding:var(--space-md);background:var(--bg-app);border-radius:var(--radius-md);">
+                            <div style="font-weight:700;color:var(--text-secondary);">Dairy & Refrigerated</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin:4px 0;">₹1,62,500</div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);">25.2% of total sales</div>
+                        </div>
+                        <div style="padding:var(--space-md);background:var(--bg-app);border-radius:var(--radius-md);">
+                            <div style="font-weight:700;color:var(--text-secondary);">Fresh Produce</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin:4px 0;">₹98,300</div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);">15.3% of total sales</div>
+                        </div>
+                        <div style="padding:var(--space-md);background:var(--bg-app);border-radius:var(--radius-md);">
+                            <div style="font-weight:700;color:var(--text-secondary);">Bakery & Snacks</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--primary);margin:4px 0;">₹98,000</div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);">15.3% of total sales</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 11: ALERTS ================= -->
+            <div id="alerts-view" class="page-view" th:style="${activeView == 'alerts' ? 'display:block;' : 'display:none;'}">
+                <div id="alertsContainer">
+                    <!-- Dynamic Alerts Container -->
+                </div>
+            </div>
+
+            <!-- ================= VIEW 12: SETTINGS ================= -->
+            <div id="settings-view" class="page-view" th:style="${activeView == 'settings' ? 'display:block;' : 'display:none;'}">
+                <div class="form-section" style="margin-bottom:var(--space-md);">
+                    <div class="form-section-title">🏪 Store Identity & Billing Information</div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Store Name</label>
+                            <input class="form-control" value="FreshLedger Supermarket">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">GSTIN / Tax ID</label>
+                            <input class="form-control" value="29AAAAA0000A1Z5">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input class="form-control" value="+91 98765 00000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Thermal Printer Paper Width</label>
+                            <select class="form-control">
+                                <option selected>80mm Standard POS Printer</option>
+                                <option>58mm Compact POS Printer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="button" onclick="showToast('Settings Saved', 'Store details and POS invoice settings updated.', 'success')">Save Settings</button>
+                </div>
+
+                <!-- Section 27: OFFLINE BACKUP AND RESTORE -->
+                <div class="form-section">
+                    <div class="form-section-title">💾 Offline Database Backup & Restore</div>
+                    <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:var(--space-md);">
+                        Safely export your products, customers, suppliers, sales history & inventory to an offline JSON file for backup.
+                    </p>
+                    <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;">
+                        <button class="btn btn-primary" type="button" onclick="exportDataBackup()">
+                            📥 Export Database Backup (JSON)
+                        </button>
+                        <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importDataBackup(event)" />
+                        <button class="btn btn-secondary" type="button" onclick="document.getElementById('importFileInput').click()">
+                            📤 Import Database Backup
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Reusable Confirmation Modal Fragment -->
+<div th:replace="~{fragments/components :: confirmModal}"></div>
+
+<!-- Reusable Product Form Modal Fragment -->
+<div th:replace="~{fragments/components :: productModal}"></div>
+
+<!-- Reusable Customer Form Modal Fragment -->
+<div th:replace="~{fragments/components :: customerModal}"></div>
+
+<!-- Reusable Supplier Form Modal Fragment -->
+<div th:replace="~{fragments/components :: supplierModal}"></div>
+
+<!-- Reusable UPI Payment Modal Fragment -->
+<div th:replace="~{fragments/components :: upiModal}"></div>
+
+<!-- Reusable WhatsApp Receipt Modal Fragment -->
+<div th:replace="~{fragments/components :: whatsAppModal}"></div>
+
+<!-- Explain My Bill Modal Fragment -->
+<div th:replace="~{fragments/components :: explainBillModal}"></div>
+
+<!-- Cashier Shift Management Modal Fragment -->
+<div th:replace="~{fragments/components :: shiftModal}"></div>
+
+<!-- Receipt Scanner Modal Fragment -->
+<div th:replace="~{fragments/components :: receiptScannerModal}"></div>
+
+<!-- Voice Billing Modal Fragment -->
+<div th:replace="~{fragments/components :: voiceBillingModal}"></div>
+
+<!-- Waste Entry Modal Fragment -->
+<div th:replace="~{fragments/components :: wasteModal}"></div>
+
+<!-- Application JS Script -->
+<script th:src="@{/js/app.js}" src="/js/app.js"></script>
+</body>
+</html>

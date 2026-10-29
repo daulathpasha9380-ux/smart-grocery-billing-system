@@ -1,0 +1,208 @@
+src/main/java/com/billingsystem/billing_system/HomeController.java:1: trailing whitespace.
+[32m+[m[32mpackage com.billingsystem.billing_system;[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:2: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:3: trailing whitespace.
+[32m+[m[32mimport org.springframework.stereotype.Controller;[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:4: trailing whitespace.
+[32m+[m[32mimport org.springframework.ui.Model;[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:5: trailing whitespace.
+[32m+[m[32mimport org.springframework.web.bind.annotation.GetMapping;[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:6: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:7: trailing whitespace.
+[32m+[m[32m@Controller[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:8: trailing whitespace.
+[32m+[m[32mpublic class HomeController {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:9: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:10: trailing whitespace.
+[32m+[m[32m    @GetMapping({"/", "/index", "/dashboard"})[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:11: trailing whitespace.
+[32m+[m[32m    public String home(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:12: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "dashboard");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:13: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:14: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:15: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:16: trailing whitespace.
+[32m+[m[32m    @GetMapping("/pos")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:17: trailing whitespace.
+[32m+[m[32m    public String pos(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:18: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "billing");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:19: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:20: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:21: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:22: trailing whitespace.
+[32m+[m[32m    @GetMapping("/products")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:23: trailing whitespace.
+[32m+[m[32m    public String products(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:24: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "products");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:25: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:26: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:27: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:28: trailing whitespace.
+[32m+[m[32m    @GetMapping("/inventory")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:29: trailing whitespace.
+[32m+[m[32m    public String inventory(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:30: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "inventory");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:31: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:32: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:33: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:34: trailing whitespace.
+[32m+[m[32m    @GetMapping("/customers")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:35: trailing whitespace.
+[32m+[m[32m    public String customers(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:36: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "customers");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:37: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:38: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:39: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:40: trailing whitespace.
+[32m+[m[32m    @GetMapping("/suppliers")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:41: trailing whitespace.
+[32m+[m[32m    public String suppliers(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:42: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "suppliers");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:43: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:44: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:45: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:46: trailing whitespace.
+[32m+[m[32m    @GetMapping("/purchases")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:47: trailing whitespace.
+[32m+[m[32m    public String purchases(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:48: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "purchases");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:49: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:50: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:51: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:52: trailing whitespace.
+[32m+[m[32m    @GetMapping("/sales")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:53: trailing whitespace.
+[32m+[m[32m    public String sales(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:54: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "sales");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:55: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:56: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:57: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:58: trailing whitespace.
+[32m+[m[32m    @GetMapping("/expenses")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:59: trailing whitespace.
+[32m+[m[32m    public String expenses(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:60: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "expenses");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:61: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:62: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:63: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:64: trailing whitespace.
+[32m+[m[32m    @GetMapping("/reports")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:65: trailing whitespace.
+[32m+[m[32m    public String reports(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:66: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "reports");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:67: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:68: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:69: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:70: trailing whitespace.
+[32m+[m[32m    @GetMapping("/alerts")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:71: trailing whitespace.
+[32m+[m[32m    public String alerts(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:72: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "alerts");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:73: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:74: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:75: trailing whitespace.
+[32m+[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:76: trailing whitespace.
+[32m+[m[32m    @GetMapping("/settings")[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:77: trailing whitespace.
+[32m+[m[32m    public String settings(Model model) {[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:78: trailing whitespace.
+[32m+[m[32m        model.addAttribute("activeView", "settings");[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:79: trailing whitespace.
+[32m+[m[32m        return "index";[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:80: trailing whitespace.
+[32m+[m[32m    }[m[41m[m
+src/main/java/com/billingsystem/billing_system/HomeController.java:81: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/main/resources/static/css/design-system.css:1: trailing whitespace.
+[32m+[m[32m/*[m[41m [m
+src/main/resources/static/js/app.js:760: trailing whitespace.
+[32m+[m[41m  [m
+src/main/resources/static/js/app.js:762: trailing whitespace.
+[32m+[m[41m  [m
+src/main/resources/static/js/app.js:766: trailing whitespace.
+[32m+[m[41m  [m
+src/main/resources/static/js/app.js:807: trailing whitespace.
+[32m+[m[32m    itemsList = cartItems.map((item, idx) =>[m[41m [m
+src/main/resources/static/js/app.js:1177: trailing whitespace.
+[32m+[m[41m  [m
+src/main/resources/static/js/app.js:2028: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/static/js/app.js:2379: trailing whitespace.
+[32m+[m[41m  [m
+src/main/resources/templates/fragments/components.html:228: trailing whitespace.
+[32m+[m[41m            [m
+src/main/resources/templates/fragments/head.html:9: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/fragments/head.html:17: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/fragments/sidebar.html:9: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/fragments/sidebar.html:12: trailing whitespace.
+[32m+[m[41m        [m
+src/main/resources/templates/fragments/sidebar.html:19: trailing whitespace.
+[32m+[m[41m        [m
+src/main/resources/templates/fragments/sidebar.html:27: trailing whitespace.
+[32m+[m[41m        [m
+src/main/resources/templates/fragments/sidebar.html:34: trailing whitespace.
+[32m+[m[41m        [m
+src/main/resources/templates/fragments/sidebar.html:102: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/index.html:12: trailing whitespace.
+[32m+[m[41m        [m
+src/main/resources/templates/index.html:18: trailing whitespace.
+[32m+[m[41m            [m
+src/main/resources/templates/index.html:37: trailing whitespace.
+[32m+[m[41m                [m
+src/main/resources/templates/login.html:7: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/login.html:12: trailing whitespace.
+[32m+[m[41m    [m
+src/main/resources/templates/login.html:15: trailing whitespace.
+[32m+[m[41m    [m
