@@ -128,18 +128,21 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Password <span class="required-star">*</span></label>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <label class="form-label" style="margin-bottom:0;">Password <span class="required-star">*</span></label>
+                    <a href="/forgot-password" style="font-size:0.84rem; color:var(--primary, #15803d); text-decoration:none; font-weight:600;">Forgot password?</a>
+                </div>
                 <input class="form-control" type="password" name="password" autocomplete="current-password" required placeholder="Enter password" />
             </div>
-
-            <p style="text-align:right;margin:calc(-1 * var(--space-sm)) 0 var(--space-md);">
-                <a th:href="@{/forgot-password}" href="/forgot-password">Forgot password?</a>
-            </p>
 
             <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:var(--space-md);">
                 <span>Sign in to Dashboard →</span>
             </button>
         </form>
+
+        <div th:if="${param.resetSuccess != null}" class="badge badge-success" style="margin-top:var(--space-md);padding:10px 14px;display:block;text-align:center;">
+            ✔ Password reset successfully! Please sign in with your new password.
+        </div>
 
         <div th:if="${param.error}" class="badge badge-danger" style="margin-top:var(--space-md);padding:8px 12px;display:block;text-align:center;">
             ❌ Invalid username or password. Please try again.
@@ -151,11 +154,11 @@
         <div th:if="${param.registered}" class="badge badge-success" style="margin-top:var(--space-md);padding:8px 12px;display:block;text-align:center;">
             ✔ Account created. Sign in to continue.
         </div>
-        <div th:if="${param.passwordReset}" class="badge badge-success" style="margin-top:var(--space-md);padding:8px 12px;display:block;text-align:center;">
-            ✔ Password updated. Sign in with your new password.
-        </div>
 
-        <p style="margin-top:var(--space-md);"><a href="/register">Create a customer account</a></p>
+        <div style="margin-top:var(--space-md); display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+            <a href="/register">Create customer account</a>
+            <a href="/forgot-password" style="color:var(--text-muted);">Forgot password?</a>
+        </div>
 
     </section>
 </main>

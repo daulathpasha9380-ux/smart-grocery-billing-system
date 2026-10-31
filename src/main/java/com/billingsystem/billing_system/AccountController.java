@@ -1,5 +1,6 @@
 package com.billingsystem.billing_system;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -24,23 +25,17 @@ public class AccountController {
 
     @PostMapping("/password")
     public void changePassword(@RequestBody PasswordChangeRequest request, Principal principal) {
-        if (request == null || request.currentPassword() == null || request.newPassword() == null) {
+        if (request == null || request.currentPassword() == null || request.newPassword() == null
+                || request.newPassword().length() < 12
+                || request.newPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Provide the current password and a valid new password.");
+                    "Provide the current password and a new password of 12 to 72 UTF-8 bytes.");
         }
 
-        List<PasswordAccount> accounts = jdbc.query("""
-                SELECT password_hash, role FROM app_users WHERE username = ? AND enabled = TRUE
-                """, (rs, row) -> new PasswordAccount(rs.getString("password_hash"), rs.getString("role")),
-                principal.getName());
-        if (accounts.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The current password is incorrect.");
-        }
-        PasswordAccount account = accounts.get(0);
-        if (!PasswordPolicy.isValid(request.newPassword(), account.role())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The new password does not meet the requirements.");
-        }
-        if (!passwordEncoder.matches(request.currentPassword(), account.passwordHash())) {
+        List<String> hashes = jdbc.query("""
+                SELECT password_hash FROM app_users WHERE username = ? AND enabled = TRUE
+                """, (rs, row) -> rs.getString("password_hash"), principal.getName());
+        if (hashes.isEmpty() || !passwordEncoder.matches(request.currentPassword(), hashes.get(0))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The current password is incorrect.");
         }
 
@@ -54,6 +49,4 @@ public class AccountController {
     }
 
     public record PasswordChangeRequest(String currentPassword, String newPassword) {}
-
-    private record PasswordAccount(String passwordHash, String role) {}
 }

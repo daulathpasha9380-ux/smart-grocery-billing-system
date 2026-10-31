@@ -76,4 +76,3 @@ public class NeonDataSourcePostProcessor implements BeanPostProcessor {
         properties.setUrl(url);
     }
 }
-

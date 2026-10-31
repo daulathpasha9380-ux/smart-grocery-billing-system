@@ -1,174 +1,164 @@
 package com.billingsystem.billing_system;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PasswordResetService {
-    private static final long TOKEN_LIFETIME_SECONDS = 30 * 60;
-    private static final long REQUEST_COOLDOWN_SECONDS = 60;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PasswordResetService.class);
+    public static final int TOKEN_EXPIRY_MINUTES = 30;
 
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
-    private final ObjectProvider<JavaMailSender> mailSenderProvider;
-    private final String mailHost;
-    private final String mailFrom;
-    private final String publicBaseUrl;
+    private final EmailService emailService;
 
-    public PasswordResetService(
-            JdbcTemplate jdbc,
-            PasswordEncoder passwordEncoder,
-            ObjectProvider<JavaMailSender> mailSenderProvider,
-            @Value("${spring.mail.host:}") String mailHost,
-            @Value("${app.mail.from}") String mailFrom,
-            @Value("${app.public-base-url}") String publicBaseUrl) {
+    public PasswordResetService(JdbcTemplate jdbc, PasswordEncoder passwordEncoder, EmailService emailService) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
-        this.mailSenderProvider = mailSenderProvider;
-        this.mailHost = mailHost;
-        this.mailFrom = mailFrom;
-        this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
+        this.emailService = emailService;
     }
 
     @Transactional
-    public void requestPasswordReset(String email) {
-        if (mailHost.isBlank()) {
-            throw new PasswordResetConfigurationException(
-                    "Password reset email is not configured. Set MAIL_HOST and SMTP settings.");
+    public ResetRequestResult initiatePasswordReset(String email, String baseUrl) {
+        if (email == null || email.isBlank()) {
+            return new ResetRequestResult(false, "Please provide a valid email address.", null, null, null);
         }
 
-        List<ResetAccount> accounts = jdbc.query("""
-                SELECT username, email FROM app_users
-                WHERE LOWER(email) = LOWER(?) AND enabled = TRUE
-                """, (rs, row) -> new ResetAccount(rs.getString("username"), rs.getString("email")), email.trim());
-        if (accounts.isEmpty()) {
-            return;
+        String normalizedEmail = email.trim().toLowerCase();
+        List<UserRecord> users = jdbc.query("""
+                SELECT username, display_name, email, enabled
+                FROM app_users
+                WHERE LOWER(email) = ?
+                """, (rs, rowNum) -> new UserRecord(
+                rs.getString("username"),
+                rs.getString("display_name"),
+                rs.getString("email"),
+                rs.getBoolean("enabled")
+        ), normalizedEmail);
+
+        if (users.isEmpty()) {
+            LOGGER.warn("Password reset requested for unregistered email: {}", normalizedEmail);
+            return new ResetRequestResult(false, "No registered account was found with that email address.", null, null, null);
         }
 
-        ResetAccount account = accounts.get(0);
-        Timestamp cooldownStart = Timestamp.from(Instant.now().minusSeconds(REQUEST_COOLDOWN_SECONDS));
-        Integer recentRequests = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM password_reset_tokens
-                WHERE username = ? AND created_at > ?
-                """, Integer.class, account.username(), cooldownStart);
-        if (recentRequests != null && recentRequests > 0) {
-            return;
+        UserRecord user = users.get(0);
+        if (!user.enabled()) {
+            LOGGER.warn("Password reset requested for disabled account: {}", user.username());
+            return new ResetRequestResult(false, "This account is currently disabled. Please contact store management.", null, null, null);
         }
 
-        jdbc.update("DELETE FROM password_reset_tokens WHERE username = ?", account.username());
-        byte[] tokenBytes = new byte[32];
-        SECURE_RANDOM.nextBytes(tokenBytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
-        Instant now = Instant.now();
+        // Invalidate prior unused tokens for this user
+        jdbc.update("UPDATE password_reset_tokens SET used = TRUE WHERE username = ? AND used = FALSE", user.username());
+
+        // Generate cryptographically random token
+        String token = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Instant expiryTime = Instant.now().plus(TOKEN_EXPIRY_MINUTES, ChronoUnit.MINUTES);
+
         jdbc.update("""
-                INSERT INTO password_reset_tokens (token_hash, username, created_at, expires_at)
-                VALUES (?, ?, ?, ?)
-                """, hashToken(token), account.username(), Timestamp.from(now),
-                Timestamp.from(now.plusSeconds(TOKEN_LIFETIME_SECONDS)));
+                INSERT INTO password_reset_tokens (token, username, email, expiry_time, used)
+                VALUES (?, ?, ?, ?, FALSE)
+                """, token, user.username(), user.email(), Timestamp.from(expiryTime));
 
-        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
-        if (mailSender == null) {
-            throw new PasswordResetConfigurationException(
-                    "Password reset email is not configured. Set MAIL_HOST and SMTP settings.");
-        }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(account.email());
-        message.setSubject("Reset your FreshLedger password");
-        message.setText("""
-                A password reset was requested for your FreshLedger account.
+        String cleanBaseUrl = (baseUrl != null && baseUrl.endsWith("/")) ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String verificationLink = cleanBaseUrl + "/reset-password?token=" + token;
 
-                Use this link within 30 minutes to choose a new password:
-                %s/reset-password?token=%s
+        emailService.sendPasswordResetEmail(user.email(), user.displayName(), verificationLink);
+        LOGGER.info("Password reset token generated for user '{}', expires at {}", user.username(), expiryTime);
 
-                If you did not request this, you can ignore this email.
-                """.formatted(publicBaseUrl, URLEncoder.encode(token, StandardCharsets.UTF_8)));
-        mailSender.send(message);
+        return new ResetRequestResult(true, "A verification link has been sent to your email address.",
+                user.email(), token, verificationLink);
     }
 
-    public boolean isValidToken(String token) {
+    public Optional<ResetTokenDetails> validateToken(String token) {
         if (token == null || token.isBlank()) {
-            return false;
+            return Optional.empty();
         }
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM password_reset_tokens
-                WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP
-                """, Integer.class, hashToken(token));
-        return count != null && count == 1;
-    }
 
-    public int minimumPasswordLengthForToken(String token) {
-        if (token == null || token.isBlank()) {
-            return PasswordPolicy.minimumLength("OWNER");
+        try {
+            List<ResetTokenDetails> tokens = jdbc.query("""
+                    SELECT t.token, t.username, t.email, t.expiry_time, t.used, u.display_name
+                    FROM password_reset_tokens t
+                    JOIN app_users u ON t.username = u.username
+                    WHERE t.token = ?
+                    """, (rs, rowNum) -> new ResetTokenDetails(
+                    rs.getString("token"),
+                    rs.getString("username"),
+                    rs.getString("email"),
+                    rs.getTimestamp("expiry_time").toInstant(),
+                    rs.getBoolean("used"),
+                    rs.getString("display_name")
+            ), token.trim());
+
+            if (tokens.isEmpty()) {
+                return Optional.empty();
+            }
+
+            ResetTokenDetails details = tokens.get(0);
+            if (details.used() || details.expiryTime().isBefore(Instant.now())) {
+                return Optional.empty();
+            }
+
+            return Optional.of(details);
+        } catch (Exception ex) {
+            LOGGER.error("Error validating reset token: {}", ex.getMessage());
+            return Optional.empty();
         }
-        List<String> roles = jdbc.query("""
-                SELECT app_users.role
-                FROM password_reset_tokens
-                JOIN app_users ON app_users.username = password_reset_tokens.username
-                WHERE password_reset_tokens.token_hash = ?
-                  AND password_reset_tokens.expires_at > CURRENT_TIMESTAMP
-                  AND app_users.enabled = TRUE
-                """, (rs, row) -> rs.getString("role"), hashToken(token));
-        return roles.isEmpty() ? PasswordPolicy.minimumLength("OWNER")
-                : PasswordPolicy.minimumLength(roles.get(0));
     }
 
     @Transactional
-    public boolean resetPassword(String token, String newPassword) {
+    public ResetCompletionResult completePasswordReset(String token, String newPassword, String confirmPassword) {
         if (token == null || token.isBlank()) {
-            return false;
-        }
-        List<String> usernames = jdbc.query("""
-                SELECT username FROM password_reset_tokens
-                WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP
-                FOR UPDATE
-                """, (rs, row) -> rs.getString("username"), hashToken(token));
-        if (usernames.isEmpty()) {
-            return false;
+            return new ResetCompletionResult(false, "Invalid or missing verification token.");
         }
 
-        String username = usernames.get(0);
-        int updated = jdbc.update("""
-                UPDATE app_users SET password_hash = ? WHERE username = ? AND enabled = TRUE
-                """, passwordEncoder.encode(newPassword), username);
-        if (updated != 1) {
-            return false;
+        Optional<ResetTokenDetails> tokenOpt = validateToken(token);
+        if (tokenOpt.isEmpty()) {
+            return new ResetCompletionResult(false, "The password reset link is invalid, expired, or has already been used. Please request a new link.");
         }
-        jdbc.update("DELETE FROM password_reset_tokens WHERE username = ?", username);
-        return true;
+
+        if (newPassword == null || confirmPassword == null) {
+            return new ResetCompletionResult(false, "Password cannot be empty.");
+        }
+
+        if (!newPassword.equals(confirmPassword)) {
+            return new ResetCompletionResult(false, "Passwords do not match. Please verify both fields.");
+        }
+
+        if (newPassword.length() < 12 || newPassword.getBytes(StandardCharsets.UTF_8).length > 72) {
+            return new ResetCompletionResult(false, "Password must be between 12 and 72 characters long.");
+        }
+
+        ResetTokenDetails details = tokenOpt.get();
+        String passwordHash = passwordEncoder.encode(newPassword);
+
+        // Update password in app_users
+        int userUpdated = jdbc.update("UPDATE app_users SET password_hash = ? WHERE username = ?", passwordHash, details.username());
+        if (userUpdated == 0) {
+            return new ResetCompletionResult(false, "User account could not be found.");
+        }
+
+        // Mark token as used
+        jdbc.update("UPDATE password_reset_tokens SET used = TRUE WHERE token = ?", token.trim());
+        LOGGER.info("Password successfully reset for user '{}'", details.username());
+
+        return new ResetCompletionResult(true, "Password has been successfully changed. You can now log in with your new credentials.");
     }
 
-    private static String hashToken(String token) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable.", exception);
-        }
-    }
-
-    private record ResetAccount(String username, String email) {}
-
-    public static class PasswordResetConfigurationException extends RuntimeException {
-        public PasswordResetConfigurationException(String message) {
-            super(message);
-        }
-    }
+    public record UserRecord(String username, String displayName, String email, boolean enabled) {}
+    public record ResetTokenDetails(String token, String username, String email, Instant expiryTime, boolean used, String displayName) {}
+    public record ResetRequestResult(boolean success, String message, String email, String token, String verificationLink) {}
+    public record ResetCompletionResult(boolean success, String message) {}
 }

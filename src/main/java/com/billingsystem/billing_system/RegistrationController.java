@@ -1,5 +1,6 @@
 package com.billingsystem.billing_system;
 
+import java.nio.charset.StandardCharsets;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,9 +38,10 @@ public class RegistrationController {
         if (!normalizedUsername.matches("[a-z0-9._-]{3,80}")
                 || displayName.isBlank() || phone.isBlank()
                 || !normalizedEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
-                || !PasswordPolicy.isValid(password, "CUSTOMER")) {
+                || password.length() < 12
+                || password.getBytes(StandardCharsets.UTF_8).length > 72) {
             model.addAttribute("registrationError",
-                    "Enter valid account details and a password of 8 to 72 UTF-8 bytes.");
+                    "Enter valid account details and a password of 12 to 72 UTF-8 bytes.");
             return "register";
         }
         try {

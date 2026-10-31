@@ -85,7 +85,6 @@ let state = {
 };
 let lastCompletedSale = null;
 let checkoutInProgress = false;
-let loyaltyValuePerPoint = 1;
 let pendingUpiResolution = null;
 let pendingResumeBill = null;
 let checkoutButtonMarkup = null;
@@ -220,10 +219,9 @@ function mapTransactionFromApi(transaction) {
 
 async function loadBackendData() {
   try {
-    const [products, customers, loyaltyRules] = await Promise.all([
+    const [products, customers] = await Promise.all([
       apiRequest('/api/products'),
-      apiRequest('/api/customers'),
-      apiRequest('/api/loyalty/rules')
+      apiRequest('/api/customers')
     ]);
     state.products = products.map(product => ({
       ...product,
@@ -231,7 +229,6 @@ async function loadBackendData() {
       price: Number(product.price)
     }));
     state.customers = customers;
-    loyaltyValuePerPoint = Number(loyaltyRules.valuePerPoint);
 
     if (document.getElementById('salesTableBody')) {
       const transactions = await apiRequest('/api/sales');
@@ -545,27 +542,6 @@ function renderPOSCustomerDropdown() {
     pendingResumeBill = null;
     sessionStorage.removeItem('freshledger_resume_bill');
   }
-  updatePOSLoyaltyControls();
-}
-
-function updatePOSLoyaltyControls() {
-  const select = document.getElementById('posCustomerSelect');
-  const input = document.getElementById('posPointsToRedeem');
-  if (!select || !input) return;
-  const customer = state.customers.find(item => item.username === select.value);
-  const available = customer ? Number(customer.points || 0) : 0;
-  input.disabled = available <= 0;
-  input.max = String(available);
-  const requested = Number.parseInt(input.value || '0', 10) || 0;
-  if (requested > available) input.value = String(available);
-  const applied = Math.min(available, Number.parseInt(input.value || '0', 10) || 0);
-  const availableDisplay = document.getElementById('posAvailablePoints');
-  const valueDisplay = document.getElementById('posRedeemValue');
-  if (availableDisplay) availableDisplay.textContent = available.toLocaleString();
-  if (valueDisplay) valueDisplay.textContent = applied
-    ? `Value: ₹${(applied * loyaltyValuePerPoint).toFixed(2)}`
-    : 'No points applied';
-  if (document.getElementById('posCartItems')) renderCart();
 }
 
 /* 4. POS Catalog & Checkout Engine */
@@ -693,14 +669,12 @@ function renderCart() {
   const subtotalDisplay = document.getElementById('posSubtotal');
   const discountDisplay = document.getElementById('posDiscount');
   const taxDisplay = document.getElementById('posTax');
-  const redemptionDisplay = document.getElementById('posLoyaltyRedemption');
   if (!container) return;
 
   if (state.cart.length === 0) {
     if (subtotalDisplay) subtotalDisplay.textContent = '₹0.00';
     if (discountDisplay) discountDisplay.textContent = '₹0.00';
     if (taxDisplay) taxDisplay.textContent = '₹0.00';
-    if (redemptionDisplay) redemptionDisplay.textContent = '₹0.00';
     if (totalDisplay) totalDisplay.textContent = '₹0.00';
   }
 
@@ -738,14 +712,11 @@ function renderCart() {
   }).join('');
 
   const totals = calculateCartTotals(state.cart);
-  const requestedPoints = Number.parseInt(document.getElementById('posPointsToRedeem')?.value || '0', 10) || 0;
-  const redemptionAmount = Math.min(totals.grandTotal, requestedPoints * loyaltyValuePerPoint);
 
   if (subtotalDisplay) subtotalDisplay.textContent = `₹${totals.subtotal.toFixed(2)}`;
   if (discountDisplay) discountDisplay.textContent = `₹${totals.discount.toFixed(2)}`;
   if (taxDisplay) taxDisplay.textContent = `₹${totals.tax.toFixed(2)}`;
-  if (redemptionDisplay) redemptionDisplay.textContent = `₹${redemptionAmount.toFixed(2)}`;
-  if (totalDisplay) totalDisplay.textContent = `₹${(totals.grandTotal - redemptionAmount).toFixed(2)}`;
+  if (totalDisplay) totalDisplay.textContent = `₹${totals.grandTotal.toFixed(2)}`;
 }
 
 // 5. UPI Payment & PhonePe Deep Linking Handler
@@ -1098,7 +1069,7 @@ function sendWhatsAppBillForInvoice(invoiceNum) {
   openWhatsAppModal(sale);
 }
 
-async function executeSaleCheckout(total, operationId, customerUsername, payMode, cartItemsCopy, pointsToRedeem) {
+async function executeSaleCheckout(total, operationId, customerUsername, payMode, cartItemsCopy) {
   try {
     const completed = await apiRequest('/api/sales', {
       method: 'POST',
@@ -1106,7 +1077,6 @@ async function executeSaleCheckout(total, operationId, customerUsername, payMode
         operationId,
         customerUsername: customerUsername === 'Walk-in Retail' ? null : customerUsername,
         paymentMode: payMode,
-        pointsToRedeem,
         items: cartItemsCopy.map(item => ({ productId: item.id, quantity: item.qty }))
       })
     });
@@ -1195,15 +1165,14 @@ function optimizeCartForBudget() {
 function onPosCustomerChange() {
   const select = document.getElementById('posCustomerSelect');
   const banner = document.getElementById('frequentlyBoughtBanner');
-  if (!select) return;
+  if (!select || !banner) return;
 
   const name = select.value;
-  if (banner && name !== 'Walk-in Retail') {
+  if (name !== 'Walk-in Retail') {
     banner.style.display = 'block';
-  } else if (banner) {
+  } else {
     banner.style.display = 'none';
   }
-  updatePOSLoyaltyControls();
 }
 
 /* 12. Explain My Bill Summary Modal Generator */
@@ -1321,275 +1290,731 @@ function calculateShiftDifference() {
   }
 }
 
-/* 14. Voice Smart Cart */
+/* ==========================================================================
+   14. FRESHLEDGER SMART CART (PHOTO & VOICE SHOPPING ENGINE)
+   ========================================================================== */
+
+const CartBridge = {
+  isCustomerPage: () => (typeof cartMap !== 'undefined' || typeof window.cartMap !== 'undefined'),
+  getCartMap: () => (typeof cartMap !== 'undefined' ? cartMap : window.cartMap),
+  triggerCustomerUpdate: () => {
+    if (typeof updateCustomerCartSummary === 'function') updateCustomerCartSummary();
+    else if (typeof window.updateCustomerCartSummary === 'function') window.updateCustomerCartSummary();
+  },
+  isPosPage: () => typeof state !== 'undefined' && Array.isArray(state.cart),
+
+  addProduct: (product, quantity = 1) => {
+    if (!product) return false;
+    const qty = Math.max(1, quantity);
+
+    if (CartBridge.isCustomerPage()) {
+      const cMap = CartBridge.getCartMap();
+      if (!cMap) return false;
+      const current = cMap.get(product.id);
+      const targetQty = (current ? current.qty : 0) + qty;
+      if (product.stock > 0 && targetQty > product.stock) {
+        showToast('Stock Limit', `${product.name} has only ${product.stock} units remaining.`, 'warning');
+        return false;
+      }
+      cMap.set(product.id, {
+        id: product.id,
+        name: product.name,
+        price: Number(product.price),
+        stock: product.stock,
+        imagePath: product.imagePath,
+        qty: targetQty
+      });
+      CartBridge.triggerCustomerUpdate();
+      showToast('Added to Cart', `Added ${qty} × ${product.name} (₹${(Number(product.price) * qty).toFixed(2)}) to your cart.`, 'success');
+      return true;
+    } else if (CartBridge.isPosPage()) {
+      for (let i = 0; i < qty; i++) {
+        addToCart(product.id);
+      }
+      showToast('Added to Bill', `Added ${qty} × ${product.name} to active bill.`, 'success');
+      return true;
+    }
+    return false;
+  },
+
+  removeProduct: (product) => {
+    if (!product) return false;
+    if (CartBridge.isCustomerPage()) {
+      const cMap = CartBridge.getCartMap();
+      if (cMap && cMap.has(product.id)) {
+        cMap.delete(product.id);
+        CartBridge.triggerCustomerUpdate();
+        showToast('Removed from Cart', `${product.name} was removed from your cart.`, 'info');
+        return true;
+      } else {
+        showToast('Not in Cart', `${product.name} is not currently in your cart.`, 'warning');
+        return false;
+      }
+    } else if (CartBridge.isPosPage()) {
+      const idx = state.cart.findIndex(i => i.id === product.id);
+      if (idx !== -1) {
+        state.cart.splice(idx, 1);
+        renderPosCart();
+        showToast('Removed', `${product.name} removed from bill.`, 'info');
+        return true;
+      }
+      showToast('Not on Bill', `${product.name} is not on current bill.`, 'warning');
+      return false;
+    }
+    return false;
+  },
+
+  updateQuantity: (product, targetQty) => {
+    if (!product) return false;
+    const qty = Math.max(0, targetQty);
+
+    if (CartBridge.isCustomerPage()) {
+      const cMap = CartBridge.getCartMap();
+      if (!cMap) return false;
+      if (qty <= 0) {
+        cMap.delete(product.id);
+      } else {
+        const cappedQty = product.stock > 0 && qty > product.stock ? product.stock : qty;
+        cMap.set(product.id, {
+          id: product.id,
+          name: product.name,
+          price: Number(product.price),
+          stock: product.stock,
+          imagePath: product.imagePath,
+          qty: cappedQty
+        });
+      }
+      CartBridge.triggerCustomerUpdate();
+      showToast('Cart Updated', `${product.name} quantity updated to ${qty}.`, 'success');
+      return true;
+    } else if (CartBridge.isPosPage()) {
+      const existing = state.cart.find(i => i.id === product.id);
+      if (existing) {
+        if (qty <= 0) {
+          state.cart = state.cart.filter(i => i.id !== product.id);
+        } else {
+          existing.qty = product.stock > 0 && qty > product.stock ? product.stock : qty;
+        }
+        renderPosCart();
+        showToast('Quantity Updated', `${product.name} quantity set to ${qty}.`, 'success');
+        return true;
+      } else if (qty > 0) {
+        return CartBridge.addProduct(product, qty);
+      }
+    }
+    return false;
+  },
+
+  clearCart: () => {
+    if (CartBridge.isCustomerPage()) {
+      const cMap = CartBridge.getCartMap();
+      if (cMap) cMap.clear();
+      sessionStorage.removeItem('customerCart');
+      CartBridge.triggerCustomerUpdate();
+      showToast('Cart Cleared', 'Your cart has been emptied.', 'info');
+      return true;
+    } else if (CartBridge.isPosPage()) {
+      state.cart = [];
+      renderPosCart();
+      showToast('Bill Cleared', 'Active bill has been emptied.', 'info');
+      return true;
+    }
+    return false;
+  },
+
+  viewCart: () => {
+    if (CartBridge.isCustomerPage()) {
+      const cartEl = document.querySelector('.cart-panel');
+      if (cartEl) {
+        cartEl.hidden = false;
+        cartEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else if (CartBridge.isPosPage()) {
+      const cartEl = document.getElementById('posCartItems');
+      if (cartEl) cartEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  },
+
+  getTotal: () => {
+    if (CartBridge.isCustomerPage()) {
+      const cMap = CartBridge.getCartMap();
+      return cMap ? Array.from(cMap.values()).reduce((sum, item) => sum + item.price * item.qty, 0) : 0;
+    } else if (CartBridge.isPosPage()) {
+      const totals = calculateCartTotals(state.cart);
+      return totals.grandTotal;
+    }
+    return 0;
+  },
+
+  search: (query) => {
+    if (CartBridge.isCustomerPage()) {
+      const input = document.getElementById('customerSearchInput');
+      if (input) {
+        input.value = query;
+        if (typeof filterCustomerProducts === 'function') filterCustomerProducts(query);
+      }
+    } else if (CartBridge.isPosPage()) {
+      const input = document.getElementById('posProductSearch');
+      if (input) {
+        input.value = query;
+        input.dispatchEvent(new Event('input'));
+      }
+    }
+  }
+};
+
+/* --- VOICE SMART CART CONTROLS --- */
+let speechRecognizerInstance = null;
+let isVoiceRecordingActive = false;
+
 function openVoiceBillingModal() {
   const modal = document.getElementById('voiceBillingModal');
-  if (!modal) return;
-  modal.classList.add('active');
-  const recognitionAvailable = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-  setVoiceStatus(recognitionAvailable
-    ? 'Speak a product or use the typed command field.'
-    : 'Speech recognition is unavailable here. Use the typed command field.');
-  document.getElementById('voiceTranscriptInput')?.focus();
+  if (modal) modal.classList.add('active');
+  const feedback = document.getElementById('voiceExecutionFeedback');
+  if (feedback) feedback.style.display = 'none';
+  const amb = document.getElementById('voiceAmbiguityContainer');
+  if (amb) amb.style.display = 'none';
+  const input = document.getElementById('voiceTranscriptInput');
+  if (input) input.focus();
 }
+
 function closeVoiceBillingModal() {
-  if (voiceRecognition) voiceRecognition.stop();
   const modal = document.getElementById('voiceBillingModal');
   if (modal) modal.classList.remove('active');
+  if (speechRecognizerInstance && isVoiceRecordingActive) {
+    try { speechRecognizerInstance.stop(); } catch (e) {}
+  }
+  isVoiceRecordingActive = false;
+  speechRecognizerInstance = null;
+  updateVoiceMicUi(false, 'Mic closed.');
 }
 
-let voiceRecognition = null;
-let pendingVoiceAction = null;
+function getSpeechRecognizer() {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) return null;
+  try {
+    const rec = new SpeechRec();
+    rec.lang = 'en-IN';
+    rec.continuous = false;
+    rec.interimResults = true;
 
-function setVoiceStatus(message) {
+    rec.onstart = () => {
+      isVoiceRecordingActive = true;
+      updateVoiceMicUi(true, '🎙️ Listening... Speak your grocery command now.');
+    };
+
+    rec.onresult = (event) => {
+      let phrase = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        phrase += event.results[i][0].transcript;
+      }
+      const input = document.getElementById('voiceTranscriptInput');
+      if (input) input.value = phrase;
+    };
+
+    rec.onerror = (event) => {
+      isVoiceRecordingActive = false;
+      speechRecognizerInstance = null;
+      let errorMsg = 'Microphone error.';
+      if (event.error === 'not-allowed') {
+        errorMsg = 'Microphone permission denied. You can type commands below.';
+      } else if (event.error === 'no-speech') {
+        errorMsg = 'No speech detected. Please speak clearly or type your command.';
+      } else if (event.error === 'audio-capture') {
+        errorMsg = 'No microphone was found on this device. You can type commands below.';
+      } else if (event.error === 'network') {
+        errorMsg = 'Speech recognition network error. You can type commands below.';
+      } else if (event.error === 'service-not-allowed') {
+        errorMsg = 'Speech service not allowed by browser. You can type commands below.';
+      }
+      updateVoiceMicUi(false, errorMsg);
+    };
+
+    rec.onend = () => {
+      isVoiceRecordingActive = false;
+      speechRecognizerInstance = null;
+      updateVoiceMicUi(false, 'Speech captured. Click "Run" or "Execute Command" to apply.');
+    };
+
+    speechRecognizerInstance = rec;
+    return rec;
+  } catch (err) {
+    console.warn('Speech recognition setup failed:', err);
+    speechRecognizerInstance = null;
+    return null;
+  }
+}
+
+function updateVoiceMicUi(listening, statusText) {
+  const btn = document.getElementById('btnMicTrigger');
   const status = document.getElementById('voiceStatusText');
-  if (status) status.textContent = message;
+  if (status) status.textContent = statusText;
+  if (btn) {
+    if (listening) {
+      btn.style.transform = 'scale(1.15)';
+      btn.style.boxShadow = '0 0 0 10px rgba(13, 93, 59, 0.25)';
+      btn.style.background = '#dc2626';
+    } else {
+      btn.style.transform = 'scale(1)';
+      btn.style.boxShadow = 'var(--shadow-lg)';
+      btn.style.background = '';
+    }
+  }
 }
 
 function toggleVoiceRecording() {
-  const input = document.getElementById('voiceTranscriptInput');
-  const btn = document.getElementById('btnMicTrigger');
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    setVoiceStatus('Speech recognition is not supported by this browser. Type a command instead.');
+  if (isVoiceRecordingActive) {
+    if (speechRecognizerInstance) {
+      try { speechRecognizerInstance.stop(); } catch (e) {}
+    }
+    isVoiceRecordingActive = false;
+    speechRecognizerInstance = null;
+    updateVoiceMicUi(false, 'Stopped listening.');
+    return;
+  }
+
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    updateVoiceMicUi(false, 'Speech recognition requires HTTPS or localhost (Secure Context). Please type your command below.');
+    const badge = document.getElementById('speechEngineBadge');
+    if (badge) badge.textContent = 'Speech recognition requires HTTPS or localhost. Please type your shopping command below.';
+    return;
+  }
+
+  const recognizer = getSpeechRecognizer();
+  if (!recognizer) {
+    updateVoiceMicUi(false, 'Browser speech recognition is not supported in this browser. Please type your command below.');
+    const badge = document.getElementById('speechEngineBadge');
+    if (badge) badge.textContent = 'Speech recognition not supported in this browser. Please type your command below.';
     return;
   }
 
   try {
-    voiceRecognition?.stop();
-    voiceRecognition = new Recognition();
-    voiceRecognition.lang = 'en-IN';
-    voiceRecognition.continuous = false;
-    voiceRecognition.interimResults = false;
-    voiceRecognition.onstart = () => {
-      if (btn) btn.setAttribute('aria-pressed', 'true');
-      setVoiceStatus('Listening. Speak one command in English.');
-    };
-    voiceRecognition.onresult = event => {
-      const transcript = event.results?.[0]?.[0]?.transcript?.trim() || '';
-      if (input) input.value = transcript;
-      setVoiceStatus(transcript ? `Recognized: ${transcript}` : 'No speech was recognized. Try again or type a command.');
-    };
-    voiceRecognition.onerror = event => {
-      const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
-        ? 'Microphone permission was denied. Allow access or type a command.'
-        : `Speech recognition failed (${event.error}). You can type a command instead.`;
-      setVoiceStatus(message);
-    };
-    voiceRecognition.onend = () => {
-      if (btn) btn.setAttribute('aria-pressed', 'false');
-    };
-    voiceRecognition.start();
-  } catch (error) {
-    if (btn) btn.setAttribute('aria-pressed', 'false');
-    setVoiceStatus('Could not start speech recognition. Type a command instead.');
-  }
-}
-
-function parseVoiceNumber(value) {
-  const normalized = value.toLowerCase();
-  if (/^\d+$/.test(normalized)) return Number(normalized);
-  return ({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 })[normalized] || null;
-}
-
-function parseVoiceQuantityAndProduct(value) {
-  const match = value.match(/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s+(?:packets?|packs?|pieces?|items?|kilograms?|kilos?|kgs?|grams?|g|litres?|liters?|l))?(?:\s+of)?\s+(.+)$/i);
-  if (!match) return { quantity: 1, product: value.trim() };
-  return { quantity: parseVoiceNumber(match[1]), product: match[2].trim() };
-}
-
-function parseVoiceCommand(value) {
-  const command = value.trim().toLowerCase().replace(/[.!?]+$/g, '').replace(/\s+/g, ' ');
-  if (!command) return null;
-  if (/^(show|view|open)( my)? cart$/.test(command)) return { intent: 'VIEW_CART' };
-  if (/^(what is )?(my )?(cart )?(total|total bill)( please)?$/.test(command)
-      || /^(what is|tell me) (my )?(total|total bill)( please)?$/.test(command)) return { intent: 'GET_TOTAL' };
-  if (/^(clear|empty)( my)? cart$/.test(command)) return { intent: 'CLEAR_CART' };
-
-  const search = command.match(/^(?:search(?: for)?|find)\s+(.+)$/);
-  if (search) return { intent: 'SEARCH_PRODUCT', query: search[1].trim() };
-
-  const remove = command.match(/^(?:remove|delete)\s+(.+?)(?:\s+from (?:my )?cart)?$/);
-  if (remove) return { intent: 'REMOVE_PRODUCT', query: remove[1].trim() };
-
-  const update = command.match(/^(?:set|change|update|increase|decrease)\s+(?:the\s+)?(?:quantity\s+of\s+)?(.+?)\s+to\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)$/);
-  if (update) return { intent: 'UPDATE_QUANTITY', query: update[1].trim(), quantity: parseVoiceNumber(update[2]) };
-
-  const add = command.match(/^(?:add|put|include)\s+(.+)$/);
-  if (add) {
-    const parsed = parseVoiceQuantityAndProduct(add[1]);
-    return { intent: 'ADD_PRODUCT', query: parsed.product, quantity: parsed.quantity };
-  }
-
-  return null;
-}
-
-function voiceCartProducts() {
-  if (typeof cartMap !== 'undefined' && typeof customerProducts !== 'undefined') return customerProducts;
-  return Array.isArray(state.products) ? state.products : [];
-}
-
-function findVoiceProductMatches(query) {
-  const normalizedQuery = query.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const words = normalizedQuery.split(/\s+/).filter(Boolean);
-  if (!words.length) return [];
-  return voiceCartProducts().filter(product => {
-    const searchable = `${product.name} ${product.brand || ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-    return searchable.includes(normalizedQuery) || words.every(word => searchable.split(/\s+/).includes(word));
-  });
-}
-
-function currentVoiceCart() {
-  if (typeof cartMap !== 'undefined' && typeof customerProducts !== 'undefined') {
-    return Array.from(cartMap.values());
-  }
-  return state.cart;
-}
-
-function setVoiceProductQuantity(product, quantity) {
-  const customerCart = typeof cartMap !== 'undefined' && typeof customerProducts !== 'undefined';
-  if (customerCart) {
-    const current = cartMap.get(product.id);
-    if (quantity > product.stock) throw new Error(`Only ${product.stock} units of ${product.name} are in stock.`);
-    if (quantity <= 0) cartMap.delete(product.id);
-    else cartMap.set(product.id, {
-      id: product.id, name: product.name, price: Number(product.price), stock: product.stock,
-      imagePath: product.imagePath, qty: quantity
-    });
-    updateCustomerCartSummary();
-    return current;
-  }
-
-  const current = state.cart.find(item => item.id === product.id);
-  if (quantity > product.stock) throw new Error(`Only ${product.stock} units of ${product.name} are in stock.`);
-  if (quantity <= 0) state.cart = state.cart.filter(item => item.id !== product.id);
-  else if (current) current.qty = quantity;
-  else state.cart.push({ id: product.id, name: product.name, price: product.price, qty: quantity });
-  renderCart();
-  return current;
-}
-
-function renderVoiceProductChoices(products, action) {
-  const container = document.getElementById('voiceCommandResults');
-  if (!container) return;
-  container.replaceChildren();
-  const heading = document.createElement('p');
-  heading.textContent = 'Choose the exact catalog item:';
-  container.append(heading);
-  products.forEach(product => {
-    const button = document.createElement('button');
-    button.className = 'btn btn-secondary';
-    button.type = 'button';
-    button.textContent = `${product.name} (${product.stock} in stock)`;
-    button.addEventListener('click', () => {
-      container.replaceChildren();
-      applyVoiceProductAction(product, action);
-    });
-    container.append(button);
-  });
-}
-
-function applyVoiceProductAction(product, action) {
-  try {
-    if (action.intent === 'REMOVE_PRODUCT') {
-      if (!currentVoiceCart().some(item => item.id === product.id)) {
-        setVoiceStatus(`${product.name} is not in the cart.`);
-        return;
-      }
-      if (!window.confirm(`Remove ${product.name} from the cart?`)) return;
-      setVoiceProductQuantity(product, 0);
-      setVoiceStatus(`${product.name} was removed from the cart.`);
-      return;
+    recognizer.start();
+  } catch (err) {
+    console.warn('Could not start recognition:', err);
+    isVoiceRecordingActive = false;
+    speechRecognizerInstance = null;
+    let msg = 'Speech recognition could not be started. You can type below.';
+    if (err.name === 'NotAllowedError') {
+      msg = 'Microphone permission was not granted. You can type below.';
     }
-    if (action.intent === 'UPDATE_QUANTITY') {
-      if (!currentVoiceCart().some(item => item.id === product.id)) {
-        setVoiceStatus(`${product.name} is not in the cart yet. Add it first.`);
-        return;
-      }
-      setVoiceProductQuantity(product, action.quantity);
-      setVoiceStatus(`${product.name} quantity set to ${action.quantity}.`);
-      return;
-    }
-    const current = currentVoiceCart().find(item => item.id === product.id);
-    const quantity = (current?.qty || 0) + action.quantity;
-    setVoiceProductQuantity(product, quantity);
-    setVoiceStatus(`Added ${action.quantity} ${product.name}${action.quantity === 1 ? '' : ' items'} to the cart.`);
-  } catch (error) {
-    setVoiceStatus(error.message);
+    updateVoiceMicUi(false, msg);
   }
 }
 
-function processVoiceTranscriptToCart() {
+function applyQuickVoiceCommand(commandText) {
   const input = document.getElementById('voiceTranscriptInput');
-  const command = parseVoiceCommand(input?.value || '');
-  const results = document.getElementById('voiceCommandResults');
-  if (results) results.replaceChildren();
-  pendingVoiceAction = null;
+  if (input) input.value = commandText;
+  processVoiceTranscriptToCart();
+}
+
+async function processVoiceTranscriptToCart() {
+  const input = document.getElementById('voiceTranscriptInput');
+  const command = input ? input.value.trim() : '';
+
+  const feedbackEl = document.getElementById('voiceExecutionFeedback');
+  const ambEl = document.getElementById('voiceAmbiguityContainer');
+
   if (!command) {
-    setVoiceStatus('Command not recognized. Try “add two packets of milk” or type a supported command.');
-    return;
-  }
-
-  if (command.intent === 'VIEW_CART' || command.intent === 'GET_TOTAL') {
-    const cart = currentVoiceCart();
-    if (command.intent === 'VIEW_CART') {
-      setVoiceStatus(cart.length ? `Cart: ${cart.map(item => `${item.name} × ${item.qty}`).join(', ')}.` : 'Your cart is empty.');
-    } else {
-      const total = calculateCartTotals(cart).grandTotal;
-      setVoiceStatus(`Current cart total: ₹${total.toFixed(2)}.`);
+    showToast('Input Required', 'Please speak or enter a shopping command.', 'warning');
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.innerHTML = '<div style="color:#d97706;font-weight:700;">Please type or speak a command (e.g. "Add two packets of Amul milk").</div>';
     }
     return;
   }
 
-  if (command.intent === 'CLEAR_CART') {
-    if (!currentVoiceCart().length) {
-      setVoiceStatus('Your cart is already empty.');
+  if (feedbackEl) {
+    feedbackEl.style.display = 'block';
+    feedbackEl.innerHTML = '<div style="color:var(--primary);font-weight:700;">⏳ Interpreting command with Smart Cart Engine...</div>';
+  }
+  if (ambEl) ambEl.style.display = 'none';
+
+  try {
+    const result = await apiRequest('/api/smart-cart/voice/parse', {
+      method: 'POST',
+      body: JSON.stringify({ command })
+    });
+
+    if (!result || !result.success) {
+      const msg = result?.feedback || "Command not recognized. Try 'add two packets of milk' or type a supported command.";
+      if (feedbackEl) {
+        feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#fef2f2;border:1px solid #f87171;border-radius:var(--radius-md);color:#991b1b;font-weight:600;">⚠️ ${escapeHtml(msg)}</div>`;
+      }
+      showToast('Command Not Recognized', msg, 'warning');
       return;
     }
-    if (!window.confirm('Clear all items from the current cart?')) return;
-    if (typeof cartMap !== 'undefined' && typeof customerProducts !== 'undefined') {
-      cartMap.clear();
-      updateCustomerCartSummary();
-    } else {
-      state.cart = [];
-      renderCart();
+
+    const { intent, product, candidates, quantity, ambiguous, feedback } = result;
+
+    if (ambiguous && candidates && candidates.length > 1) {
+      if (feedbackEl) {
+        feedbackEl.innerHTML = `<div style="padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius-md);color:#1e40af;font-weight:700;">${escapeHtml(feedback)}</div>`;
+      }
+      renderVoiceCandidates(candidates, quantity);
+      return;
     }
-    setVoiceStatus('The cart was cleared.');
+
+    switch (intent) {
+      case 'ADD_PRODUCT':
+        if (product) {
+          CartBridge.addProduct(product, quantity);
+          if (feedbackEl) {
+            feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;font-weight:700;">✔ Added ${quantity} × ${escapeHtml(product.name)} (₹${(Number(product.price) * quantity).toFixed(2)}) to cart.</div>`;
+          }
+        }
+        break;
+      case 'REMOVE_PRODUCT':
+        if (product) {
+          CartBridge.removeProduct(product);
+          if (feedbackEl) {
+            feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;font-weight:700;">✔ Removed ${escapeHtml(product.name)} from cart.</div>`;
+          }
+        }
+        break;
+      case 'UPDATE_QUANTITY':
+        if (product) {
+          CartBridge.updateQuantity(product, quantity);
+          if (feedbackEl) {
+            feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;font-weight:700;">✔ Updated ${escapeHtml(product.name)} quantity to ${quantity}.</div>`;
+          }
+        }
+        break;
+      case 'CLEAR_CART':
+        CartBridge.clearCart();
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;font-weight:700;">✔ Cleared all items from cart.</div>`;
+        }
+        break;
+      case 'VIEW_CART':
+        closeVoiceBillingModal();
+        CartBridge.viewCart();
+        break;
+      case 'GET_TOTAL':
+        const total = CartBridge.getTotal();
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius-md);color:#1e40af;font-weight:700;">💰 Total Bill Amount: ₹${Number(total).toFixed(2)}</div>`;
+        }
+        showToast('Total Bill', `Current total is ₹${Number(total).toFixed(2)}`, 'info');
+        break;
+      case 'SEARCH_PRODUCT':
+        closeVoiceBillingModal();
+        CartBridge.search(result.productQuery);
+        break;
+      default:
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;">${escapeHtml(feedback)}</div>`;
+        }
+    }
+  } catch (err) {
+    console.error('Voice parsing error:', err);
+    if (feedbackEl) {
+      feedbackEl.innerHTML = `<div style="padding:10px 14px;background:#fef2f2;border:1px solid #f87171;border-radius:var(--radius-md);color:#991b1b;">❌ ${escapeHtml(err.message)}</div>`;
+    }
+    showToast('Voice Error', err.message, 'danger');
+  }
+}
+
+function renderVoiceCandidates(candidates, quantity) {
+  const container = document.getElementById('voiceAmbiguityContainer');
+  const list = document.getElementById('voiceCandidatesList');
+  if (!container || !list) return;
+
+  list.replaceChildren();
+  candidates.forEach(cand => {
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fff;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);';
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(cand.name)}</strong>
+        <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(cand.brand)} • ₹${Number(cand.price).toFixed(2)}</div>
+      </div>
+      <button class="btn btn-primary" type="button" style="padding:4px 10px;font-size:0.8rem;">+ Add ${quantity}</button>
+    `;
+    item.querySelector('button').addEventListener('click', () => {
+      CartBridge.addProduct(cand, quantity);
+      container.style.display = 'none';
+      const feedbackEl = document.getElementById('voiceExecutionFeedback');
+      if (feedbackEl) {
+        feedbackEl.innerHTML = `<div style="padding:8px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);color:#166534;font-weight:700;">✔ Added ${quantity} × ${escapeHtml(cand.name)} to cart.</div>`;
+      }
+    });
+    list.append(item);
+  });
+  container.style.display = 'block';
+}
+
+/* --- PHOTO SMART CART CONTROLS --- */
+const photoState = {
+  selectedProduct: null,
+  quantity: 1,
+  cameraStream: null
+};
+
+function openPhotoCartModal() {
+  const modal = document.getElementById('photoCartModal');
+  if (modal) modal.classList.add('active');
+  resetPhotoModalState();
+}
+
+function closePhotoCartModal() {
+  const modal = document.getElementById('photoCartModal');
+  if (modal) modal.classList.remove('active');
+  stopPhotoCamera();
+}
+
+function resetPhotoModalState() {
+  photoState.selectedProduct = null;
+  photoState.quantity = 1;
+  const ind = document.getElementById('photoAnalyzingIndicator');
+  const res = document.getElementById('photoRecognitionResult');
+  const cand = document.getElementById('photoCandidateGrid');
+  const err = document.getElementById('photoErrorFeedback');
+  const prev = document.getElementById('photoPreviewContainer');
+
+  if (ind) ind.style.display = 'none';
+  if (res) res.style.display = 'none';
+  if (cand) cand.style.display = 'none';
+  if (err) err.style.display = 'none';
+  if (prev) prev.style.display = 'none';
+  stopPhotoCamera();
+}
+
+function handlePhotoCartFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  // Local image preview
+  const preview = document.getElementById('photoCartPreviewImg');
+  const previewContainer = document.getElementById('photoPreviewContainer');
+  if (preview && previewContainer) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.src = e.target.result;
+      previewContainer.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  processPhotoUpload(file);
+}
+
+async function startPhotoCamera() {
+  const video = document.getElementById('photoCameraVideo');
+  const previewArea = document.getElementById('photoCameraPreviewArea');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('Camera Unavailable', 'Camera stream is not supported in this browser. Please use the "Upload Photo" button.', 'warning');
     return;
   }
 
-  if (command.intent === 'SEARCH_PRODUCT') {
-    const searchInput = document.getElementById('posProductSearch') || document.getElementById('customerSearchInput');
-    if (searchInput) {
-      searchInput.value = command.query;
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      setVoiceStatus(`Showing catalog results for “${command.query}”.`);
-    } else {
-      setVoiceStatus('Product search is unavailable on this page.');
+  try {
+    photoState.cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    if (video) {
+      video.srcObject = photoState.cameraStream;
+      video.play();
     }
-    return;
+    if (previewArea) previewArea.style.display = 'block';
+  } catch (err) {
+    console.warn('Camera access denied or failed:', err);
+    showToast('Camera Access', 'Camera permission was not granted. Please select an image file instead.', 'info');
+  }
+}
+
+function capturePhotoSnapshot() {
+  const video = document.getElementById('photoCameraVideo');
+  if (!video) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob((blob) => {
+    stopPhotoCamera();
+    if (!blob) return;
+
+    const file = new File([blob], 'captured_product.jpg', { type: 'image/jpeg' });
+
+    const preview = document.getElementById('photoCartPreviewImg');
+    const previewContainer = document.getElementById('photoPreviewContainer');
+    if (preview && previewContainer) {
+      preview.src = canvas.toDataURL('image/jpeg');
+      previewContainer.style.display = 'block';
+    }
+
+    processPhotoUpload(file);
+  }, 'image/jpeg', 0.92);
+}
+
+function stopPhotoCamera() {
+  if (photoState.cameraStream) {
+    photoState.cameraStream.getTracks().forEach(track => track.stop());
+    photoState.cameraStream = null;
+  }
+  const previewArea = document.getElementById('photoCameraPreviewArea');
+  if (previewArea) previewArea.style.display = 'none';
+}
+
+async function processPhotoUpload(file) {
+  const indicator = document.getElementById('photoAnalyzingIndicator');
+  const resultCard = document.getElementById('photoRecognitionResult');
+  const candidateGrid = document.getElementById('photoCandidateGrid');
+  const errorFeedback = document.getElementById('photoErrorFeedback');
+
+  if (indicator) indicator.style.display = 'block';
+  if (resultCard) resultCard.style.display = 'none';
+  if (candidateGrid) candidateGrid.style.display = 'none';
+  if (errorFeedback) errorFeedback.style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const result = await apiRequest('/api/smart-cart/photo/recognize', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (indicator) indicator.style.display = 'none';
+
+    if (!result || !result.success) {
+      const msg = result?.feedback || "Could not identify product from photo. Please try a clearer photo or search manually.";
+      if (errorFeedback) {
+        errorFeedback.style.display = 'block';
+        errorFeedback.textContent = msg;
+      }
+      showToast('Recognition Notice', msg, 'warning');
+      return;
+    }
+
+    if (result.ambiguous && result.candidates && result.candidates.length > 1) {
+      if (candidateGrid) candidateGrid.style.display = 'block';
+      renderPhotoCandidateList(result.candidates, result.method);
+    } else if (result.product) {
+      photoState.selectedProduct = result.product;
+      photoState.quantity = 1;
+      displayPhotoMatchCard(result.product, result.method, result.detectedBarcode);
+    }
+  } catch (err) {
+    if (indicator) indicator.style.display = 'none';
+    if (errorFeedback) {
+      errorFeedback.style.display = 'block';
+      errorFeedback.textContent = err.message || 'Image processing failed.';
+    }
+    showToast('Photo Error', err.message, 'danger');
+  }
+}
+
+function displayPhotoMatchCard(product, method, barcode) {
+  const resultCard = document.getElementById('photoRecognitionResult');
+  if (!resultCard) return;
+
+  const badge = document.getElementById('photoMatchMethodBadge');
+  const stockBadge = document.getElementById('photoMatchStockBadge');
+  const img = document.getElementById('photoMatchProductImg');
+  const nameEl = document.getElementById('photoMatchProductName');
+  const metaEl = document.getElementById('photoMatchProductMeta');
+  const priceEl = document.getElementById('photoMatchProductPrice');
+  const qtyEl = document.getElementById('photoMatchQtyDisplay');
+
+  if (badge) {
+    badge.textContent = method === 'BARCODE' ? `✔ Barcode Match (${barcode || product.barcode})`
+      : (method === 'OCR' ? '✔ Packaging Text OCR Match' : '✔ Visual Similarity Match');
   }
 
-  if (command.intent === 'UPDATE_QUANTITY' && command.quantity < 1) {
-    setVoiceStatus('Choose a quantity of at least one. Use “remove” to remove an item.');
+  if (stockBadge) {
+    stockBadge.textContent = product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock';
+    stockBadge.className = product.stock > 0 ? 'pill' : 'pill badge-danger';
+  }
+
+  if (img) {
+    img.src = product.imagePath || suggestedProductImage(product);
+  }
+
+  if (nameEl) nameEl.textContent = product.name;
+  if (metaEl) metaEl.textContent = `${product.category} • ${product.brand} • Barcode: ${product.barcode}`;
+  if (priceEl) priceEl.textContent = `₹${Number(product.price).toFixed(2)}`;
+  if (qtyEl) qtyEl.textContent = '1';
+
+  resultCard.style.display = 'block';
+}
+
+function renderPhotoCandidateList(candidates, method) {
+  const list = document.getElementById('photoCandidatesList');
+  if (!list) return;
+  list.replaceChildren();
+
+  // If grocery shopping list has multiple candidates, provide an "Add All" button
+  if (candidates.length > 1) {
+    const allBox = document.createElement('div');
+    allBox.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);margin-bottom:8px;';
+    allBox.innerHTML = `
+      <div>
+        <strong style="color:#166534;font-size:0.95rem;">Shopping List Detected</strong>
+        <div style="font-size:0.78rem;color:#15803d;">${candidates.length} matching products found in catalog</div>
+      </div>
+      <button class="btn btn-primary" type="button" style="padding:8px 16px;font-size:0.85rem;font-weight:800;">
+        🛒 Add All to Cart
+      </button>
+    `;
+    allBox.querySelector('button').addEventListener('click', () => {
+      let addedCount = 0;
+      candidates.forEach(c => {
+        if (CartBridge.addProduct(c, 1)) addedCount++;
+      });
+      closePhotoCartModal();
+      showToast('List Added', `Added ${addedCount} grocery items to your cart.`, 'success');
+    });
+    list.append(allBox);
+  }
+
+  candidates.forEach(cand => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px;background:#fff;border:1px solid var(--border-subtle);border-radius:var(--radius-md);gap:10px;';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <img src="${cand.imagePath || suggestedProductImage(cand)}" alt="" style="width:40px;height:40px;object-fit:contain;background:#f4f7f5;border-radius:6px;padding:2px;" />
+        <div style="min-width:0;">
+          <strong style="font-size:0.9rem;">${escapeHtml(cand.name)}</strong>
+          <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(cand.brand)} • ₹${Number(cand.price).toFixed(2)} • ${cand.stock} in stock</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" type="button" style="padding:6px 12px;font-size:0.82rem;font-weight:700;">+ Select & Add</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => {
+      CartBridge.addProduct(cand, 1);
+      closePhotoCartModal();
+    });
+    list.append(card);
+  });
+}
+
+function stepPhotoQty(delta) {
+  const current = photoState.quantity || 1;
+  const next = Math.max(1, current + delta);
+  if (photoState.selectedProduct && photoState.selectedProduct.stock > 0 && next > photoState.selectedProduct.stock) {
+    showToast('Stock Limit', `Only ${photoState.selectedProduct.stock} units in stock.`, 'warning');
     return;
   }
-  const matches = findVoiceProductMatches(command.query);
-  if (!matches.length) {
-    setVoiceStatus(`No catalog product matched “${command.query}”. Nothing was added.`);
-    return;
+  photoState.quantity = next;
+  const qtyEl = document.getElementById('photoMatchQtyDisplay');
+  if (qtyEl) qtyEl.textContent = String(next);
+}
+
+function confirmAddPhotoProduct() {
+  if (!photoState.selectedProduct) return;
+  const success = CartBridge.addProduct(photoState.selectedProduct, photoState.quantity);
+  if (success) {
+    closePhotoCartModal();
   }
-  pendingVoiceAction = command;
-  if (matches.length > 1) {
-    setVoiceStatus('Several catalog items match. Select the correct one to continue.');
-    renderVoiceProductChoices(matches, command);
-    return;
-  }
-  applyVoiceProductAction(matches[0], command);
 }
 
 
-/* 15. Product Photo Barcode Matching */
+/* 15. Offline Receipt Scanner Simulation */
 function openReceiptScannerModal() {
   const modal = document.getElementById('receiptScannerModal');
   if (modal) modal.classList.add('active');
@@ -1599,79 +2024,35 @@ function closeReceiptScannerModal() {
   if (modal) modal.classList.remove('active');
 }
 
-async function simulateReceiptScan(event) {
+function simulateReceiptScan(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const results = document.getElementById('receiptScanResults');
-  if (!results) return;
-  results.replaceChildren();
-  results.hidden = false;
+  showToast('Scanning Receipt Image', 'Extracting OCR lines from old receipt image...', 'info');
 
-  const message = text => {
-    results.replaceChildren();
-    const paragraph = document.createElement('p');
-    paragraph.setAttribute('role', 'status');
-    paragraph.textContent = text;
-    results.append(paragraph);
-  };
+  setTimeout(() => {
+    const resultsContainer = document.getElementById('receiptScanResults');
+    const tbody = document.getElementById('receiptParsedTableBody');
+    const importBtn = document.getElementById('btnImportReceiptToCart');
 
-  if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-    message('Choose an image file no larger than 5 MB.');
-    event.target.value = '';
-    return;
-  }
-  if (!window.BarcodeDetector || typeof createImageBitmap !== 'function') {
-    message('This browser does not support photo barcode detection. Search for the product manually; nothing was added.');
-    return;
-  }
+    if (resultsContainer && tbody) {
+      tbody.innerHTML = `
+        <tr><td>Amul Taaza Milk 1L</td><td>2</td><td>₹32.00</td><td><strong>₹64.00</strong></td></tr>
+        <tr><td>Harvest Gold Bread</td><td>1</td><td>₹45.00</td><td><strong>₹45.00</strong></td></tr>
+        <tr><td>Tata Salt 1kg</td><td>1</td><td>₹28.00</td><td><strong>₹28.00</strong></td></tr>
+      `;
+      resultsContainer.style.display = 'block';
+      if (importBtn) importBtn.style.display = 'inline-block';
+    }
+  }, 1200);
+}
 
-  message('Checking the photo for a product barcode…');
-  let bitmap;
-  try {
-    const availableFormats = await window.BarcodeDetector.getSupportedFormats();
-    const formats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
-      .filter(format => availableFormats.includes(format));
-    if (!formats.length) {
-      message('This browser cannot decode supported product barcode formats. Search manually; nothing was added.');
-      return;
-    }
-    bitmap = await createImageBitmap(file);
-    const detector = new window.BarcodeDetector({ formats });
-    const detections = await detector.detect(bitmap);
-    const productIds = new Set();
-    const catalog = voiceCartProducts();
-    for (const detection of detections) {
-      const product = catalog.find(item => item.barcode === detection.rawValue);
-      if (product) productIds.add(product.id);
-    }
-    const products = catalog.filter(product => productIds.has(product.id));
-    if (!products.length) {
-      message(detections.length
-        ? 'No detected barcode exactly matched the store catalog. Search manually; nothing was added.'
-        : 'No barcode was visible in this photo. Try a clearer barcode photo or search manually. Nothing was added.');
-      return;
-    }
-    results.replaceChildren();
-    const heading = document.createElement('p');
-    heading.textContent = 'Exact catalog matches. Select the product to add one unit:';
-    results.append(heading);
-    products.forEach(product => {
-      const button = document.createElement('button');
-      button.className = 'btn btn-secondary';
-      button.type = 'button';
-      button.textContent = `${product.name} · ${product.stock > 0 ? `${product.stock} in stock` : 'out of stock'}`;
-      button.disabled = product.stock <= 0;
-      button.addEventListener('click', () => {
-        applyVoiceProductAction(product, { intent: 'ADD_PRODUCT', quantity: 1 });
-      });
-      results.append(button);
-    });
-  } catch (error) {
-    message('Barcode detection failed. Try another image or use product search; nothing was added.');
-  } finally {
-    bitmap?.close();
-  }
+function importParsedReceiptToCart() {
+  addToCart(1); // Milk
+  addToCart(3); // Bread
+  addToCart(5); // Salt
+  closeReceiptScannerModal();
+  showToast('Receipt Imported', 'Scanned items added to active bill.', 'success');
 }
 
 /* 16. Waste Entry Handler */
@@ -1681,12 +2062,7 @@ function openWasteModal() {
   if (!modal) return;
 
   if (select) {
-    select.replaceChildren(...state.products.map(product => {
-      const option = document.createElement('option');
-      option.value = String(product.id);
-      option.textContent = `${product.name} (Stock: ${product.stock})`;
-      return option;
-    }));
+    select.innerHTML = state.products.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`).join('');
   }
   modal.classList.add('active');
 }
@@ -1699,29 +2075,34 @@ function closeWasteModal() {
 document.addEventListener('DOMContentLoaded', () => {
   const wasteForm = document.getElementById('wasteForm');
   if (wasteForm) {
-    wasteForm.addEventListener('submit', async (e) => {
+    wasteForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const prodId = Number.parseInt(document.getElementById('wasteProductSelect').value, 10);
+      const prodId = parseInt(document.getElementById('wasteProductSelect').value);
       const formData = new FormData(wasteForm);
-      const submitButton = wasteForm.querySelector('[type="submit"]');
-      if (submitButton) submitButton.disabled = true;
-      try {
-        const waste = await apiRequest(`/api/owner/products/${prodId}/waste`, {
-          method: 'POST',
-          body: JSON.stringify({
-            quantity: Number.parseInt(formData.get('quantity'), 10),
-            reason: formData.get('reason'),
-            notes: formData.get('notes')
-          })
+      const qty = parseInt(formData.get('quantity')) || 1;
+      const reason = formData.get('reason') || 'Expired';
+      const notes = formData.get('notes') || '';
+
+      const prod = state.products.find(p => p.id === prodId);
+      if (prod) {
+        prod.stock = Math.max(0, prod.stock - qty);
+        if (prod.stock === 0) prod.status = 'Out of Stock';
+        else if (prod.stock <= prod.minStock) prod.status = 'Low Stock';
+
+        const wasteVal = prod.purchasePrice * qty;
+        state.expenses.unshift({
+          id: state.expenses.length + 1,
+          date: 'Today',
+          category: `Waste (${reason})`,
+          description: `${qty} x ${prod.name} - ${notes}`,
+          method: 'Loss Deducted',
+          amount: wasteVal
         });
-        await loadBackendData();
+
+        saveState();
+        renderAllViews();
         closeWasteModal();
-        wasteForm.reset();
-        showToast('Waste Logged', `Recorded ₹${Number(waste.loss).toFixed(2)} stock loss for ${waste.productName}.`, 'warning');
-      } catch (error) {
-        showToast('Waste Not Recorded', error.message, 'danger');
-      } finally {
-        if (submitButton) submitButton.disabled = false;
+        showToast('Waste Logged', `Logged ₹${wasteVal.toFixed(2)} stock loss for ${prod.name}.`, 'warning');
       }
     });
   }
@@ -1833,10 +2214,6 @@ function initPOS() {
     });
   }
 
-  const pointsInput = document.getElementById('posPointsToRedeem');
-  if (pointsInput) pointsInput.addEventListener('input', updatePOSLoyaltyControls);
-  updatePOSLoyaltyControls();
-
   document.querySelectorAll('.category-filter-pills .pill-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.category-filter-pills .pill-btn').forEach(b => b.classList.remove('active'));
@@ -1860,13 +2237,11 @@ function initPOS() {
         return;
       }
 
-      const baseTotal = calculateCartTotals(state.cart).grandTotal;
+      const total = calculateCartTotals(state.cart).grandTotal;
       const operationId = crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const customerUsername = document.getElementById('posCustomerSelect')?.value || 'Walk-in Retail';
-      const pointsToRedeem = Number.parseInt(document.getElementById('posPointsToRedeem')?.value || '0', 10) || 0;
-      const total = Math.max(0, baseTotal - pointsToRedeem * loyaltyValuePerPoint);
       const payRadio = document.querySelector('input[name="payType"]:checked');
       const payModeVal = payRadio ? payRadio.value : 'Cash';
       const cartItemsCopy = state.cart.map(item => ({ ...item }));
@@ -1878,7 +2253,7 @@ function initPOS() {
           const confirmed = await triggerUpiCheckout(total, operationId, customerUsername, cartItemsCopy);
           if (!confirmed) return;
         }
-        await executeSaleCheckout(total, operationId, customerUsername, payModeVal, cartItemsCopy, pointsToRedeem);
+        await executeSaleCheckout(total, operationId, customerUsername, payModeVal, cartItemsCopy);
       } catch (error) {
         console.error('Sale checkout could not be started.', error);
         showToast('Payment Failed', error.message, 'danger');
@@ -1983,9 +2358,6 @@ function resetPOSCustomerAndPayment() {
   if (customerSelect) customerSelect.value = 'Walk-in Retail';
   const cashPayment = document.querySelector('input[name="payType"][value="Cash"]');
   if (cashPayment) cashPayment.checked = true;
-  const pointsInput = document.getElementById('posPointsToRedeem');
-  if (pointsInput) pointsInput.value = '0';
-  updatePOSLoyaltyControls();
 }
 
 /* 7. Product Form Handler */

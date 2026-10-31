@@ -38,11 +38,15 @@
     <aside class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <h2 style="margin:0;">Product Search</h2>
-            <div style="display:flex;gap:8px;align-items:center;">
-                <button class="btn btn-secondary" type="button" onclick="openVoiceBillingModal()" aria-label="Open voice smart cart">🎙️ Voice</button>
-                <button class="btn btn-secondary" type="button" onclick="openReceiptScannerModal()" aria-label="Find product from photo">📷 Photo</button>
-                <a href="/cashier/dashboard" style="color:#0d5d3b;font-weight:800;text-decoration:none;">← Back</a>
-            </div>
+            <a href="/cashier/dashboard" style="color:#0d5d3b;font-weight:800;text-decoration:none;">← Back</a>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button id="btnPosPhotoCart" class="btn btn-secondary" type="button" onclick="openPhotoCartModal()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.85rem;padding:8px 12px;font-weight:700;">
+                <span>📷</span><span>Photo Cart</span>
+            </button>
+            <button id="btnPosVoiceCart" class="btn btn-secondary" type="button" onclick="openVoiceBillingModal()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.85rem;padding:8px 12px;font-weight:700;">
+                <span>🎤</span><span>Voice Cart</span>
+            </button>
         </div>
         <input id="posProductSearch" class="search-box" type="text" placeholder="Search by product name or barcode" aria-label="Search products" />
         <div class="chip-row category-filter-pills">
@@ -76,9 +80,6 @@
         <div style="margin-bottom:12px;">
             <label for="posCustomerSelect" style="display:block;font-size:.76rem;font-weight:700;color:#60756a;letter-spacing:.08em;margin-bottom:8px;">Customer</label>
             <select id="posCustomerSelect" class="search-box" style="padding:12px 14px;"></select>
-            <label for="posPointsToRedeem" style="display:block;margin:8px 0 4px;font-size:.8rem;font-weight:700;">Redeem points (<span id="posAvailablePoints">0</span> available)</label>
-            <input id="posPointsToRedeem" class="search-box" type="number" min="0" step="1" value="0" disabled />
-            <small id="posRedeemValue" style="color:#60756a;">No points applied</small>
         </div>
 
         <div id="posCartItems" class="cart-list"></div>
@@ -86,7 +87,6 @@
         <div class="totals">
             <div class="total-row"><span>Subtotal</span><strong id="posSubtotal">₹0.00</strong></div>
             <div class="total-row"><span>Discount</span><strong id="posDiscount">₹0.00</strong></div>
-            <div class="total-row"><span>Loyalty redemption</span><strong id="posLoyaltyRedemption">₹0.00</strong></div>
             <div class="total-row"><span>Tax</span><strong id="posTax">₹0.00</strong></div>
             <div class="total-row" style="font-size:1.2rem;"><span>Grand Total</span><strong id="posGrandTotal">₹0.00</strong></div>
         </div>
@@ -111,8 +111,8 @@
 <div th:replace="~{fragments/components :: upiModal}"></div>
 <div th:replace="~{fragments/components :: whatsAppModal}"></div>
 <div th:replace="~{fragments/components :: explainBillModal}"></div>
+<div th:replace="~{fragments/components :: photoCartModal}"></div>
 <div th:replace="~{fragments/components :: voiceBillingModal}"></div>
-<div th:replace="~{fragments/components :: receiptScannerModal}"></div>
 
 <script th:src="@{/js/app.js}" src="/js/app.js"></script>
 </body>

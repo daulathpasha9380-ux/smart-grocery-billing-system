@@ -321,56 +321,209 @@
     </div>
 </div>
 
-<!-- Product Photo Barcode Matcher Modal Fragment -->
+<!-- Receipt Scanner Modal Fragment -->
 <div th:fragment="receiptScannerModal" id="receiptScannerModal" class="modal-backdrop" role="dialog" aria-modal="true">
     <div class="modal-card" style="max-width: 620px;">
         <div class="modal-header">
-            <h3 class="modal-title">Find Product From Photo</h3>
+            <h3 class="modal-title">📷 Scan Old Receipt (Offline OCR)</h3>
             <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeReceiptScannerModal()">&times;</button>
         </div>
         <div class="modal-body">
             <div style="border:2px dashed var(--border-subtle);padding:var(--space-xl);text-align:center;border-radius:var(--radius-md);background:var(--bg-app);margin-bottom:var(--space-md);">
                 <div style="font-size:2.5rem;margin-bottom:8px;">📄</div>
-                <div style="font-weight:700;margin-bottom:4px;">Upload or capture a product barcode</div>
-                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-md);">Only an exact barcode match in the store catalog can be offered to your cart.</div>
-                <input type="file" id="receiptFileInput" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" onchange="simulateReceiptScan(event)" />
+                <div style="font-weight:700;margin-bottom:4px;">Upload or Capture Receipt Image</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-md);">Extracts Product, Qty, Price, Total offline for quick stock entry/billing.</div>
+                <input type="file" id="receiptFileInput" accept="image/*" style="display:none;" onchange="simulateReceiptScan(event)" />
+                <button class="btn btn-secondary" type="button" onclick="document.getElementById('receiptFileInput').click()">📁 Select Image / Camera</button>
             </div>
-            <div id="receiptScanResults" aria-live="polite" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+            <div id="receiptScanResults" style="display:none;">
+                <div class="form-section-title">Parsed Receipt Items Review</div>
+                <div class="table-container" style="max-height:180px;overflow-y:auto;box-shadow:none;border:1px solid var(--border-subtle);">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Product Item</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiptParsedTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" type="button" onclick="closeReceiptScannerModal()">Cancel</button>
+            <button id="btnImportReceiptToCart" class="btn btn-primary" type="button" style="display:none;" onclick="importParsedReceiptToCart()">🛒 Import to Billing Cart</button>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Smart Cart Modal Fragment -->
+<div th:fragment="photoCartModal" id="photoCartModal" class="modal-backdrop" role="dialog" aria-modal="true" style="z-index:95;">
+    <div class="modal-card" style="max-width: 580px; max-height: 92vh; display:flex; flex-direction:column;">
+        <div class="modal-header">
+            <h3 class="modal-title">📷 Photo Smart Cart</h3>
+            <button class="modal-close-btn" type="button" aria-label="Close" onclick="closePhotoCartModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="overflow-y:auto; padding:var(--space-lg);">
+            <div style="font-size:0.88rem;color:var(--text-muted);margin-bottom:var(--space-md);">
+                Upload or capture a photograph of a grocery item. The server identifies the product using Barcode (ZXing), Packaging OCR, and Visual Recognition.
+            </div>
+
+            <!-- Upload / Camera Buttons -->
+            <div style="display:flex;gap:10px;justify-content:center;margin-bottom:var(--space-md);flex-wrap:wrap;">
+                <input type="file" id="photoCartFileInput" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handlePhotoCartFileSelect(event)" />
+                <button class="btn btn-primary" type="button" onclick="document.getElementById('photoCartFileInput').click()" style="display:inline-flex;align-items:center;gap:6px;">
+                    📁 Upload Photo
+                </button>
+                <button id="btnTogglePhotoCamera" class="btn btn-secondary" type="button" onclick="startPhotoCamera()" style="display:inline-flex;align-items:center;gap:6px;">
+                    📸 Use Camera
+                </button>
+            </div>
+
+            <!-- Live Camera Feed (Hidden initially) -->
+            <div id="photoCameraPreviewArea" style="display:none;margin-bottom:var(--space-md);text-align:center;border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:10px;background:#000;">
+                <video id="photoCameraVideo" autoplay playsinline style="width:100%;max-height:240px;object-fit:cover;border-radius:var(--radius-sm);"></video>
+                <div style="margin-top:10px;display:flex;justify-content:center;gap:10px;">
+                    <button class="btn btn-primary" type="button" onclick="capturePhotoSnapshot()">📸 Capture Snapshot</button>
+                    <button class="btn btn-secondary" type="button" onclick="stopPhotoCamera()">Cancel Camera</button>
+                </div>
+            </div>
+
+            <!-- Image Preview Area -->
+            <div id="photoPreviewContainer" style="display:none;text-align:center;margin-bottom:var(--space-md);background:var(--bg-app);padding:10px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);">
+                <img id="photoCartPreviewImg" src="" alt="Selected product preview" style="max-height:180px;max-width:100%;object-fit:contain;border-radius:var(--radius-sm);" />
+            </div>
+
+            <!-- Analysis Progress Spinner -->
+            <div id="photoAnalyzingIndicator" style="display:none;text-align:center;padding:var(--space-md);background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);margin-bottom:var(--space-md);">
+                <div style="font-weight:700;color:#166534;margin-bottom:4px;">🔍 Analyzing Product Photo...</div>
+                <div style="font-size:0.8rem;color:#15803d;">Running barcode decoding, packaging text OCR, and catalog visual matching</div>
+            </div>
+
+            <!-- Error / No Match Notice -->
+            <div id="photoErrorFeedback" style="display:none;padding:12px;background:#fef2f2;border:1px solid #f87171;border-radius:var(--radius-md);color:#991b1b;font-size:0.88rem;margin-bottom:var(--space-md);">
+            </div>
+
+            <!-- Single Product Recognition Match Result -->
+            <div id="photoRecognitionResult" style="display:none;border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px;background:#fff;box-shadow:var(--shadow-sm);margin-bottom:var(--space-md);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span id="photoMatchMethodBadge" class="badge badge-success" style="font-weight:700;font-size:0.75rem;">✔ Recognized</span>
+                    <span id="photoMatchStockBadge" class="pill" style="font-size:0.75rem;">In Stock</span>
+                </div>
+                <div style="display:flex;gap:14px;align-items:center;">
+                    <div id="photoMatchImageContainer" style="width:70px;height:70px;border-radius:10px;background:#f4f7f5;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                        <img id="photoMatchProductImg" src="/images/products/placeholder.svg" alt="Product" style="width:100%;height:100%;object-fit:contain;padding:4px;" />
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <h4 id="photoMatchProductName" style="margin:0 0 4px;font-size:1.05rem;">Product Name</h4>
+                        <div id="photoMatchProductMeta" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">Category • Brand</div>
+                        <div id="photoMatchProductPrice" style="font-size:1.2rem;font-weight:800;color:var(--primary);">₹0.00</div>
+                    </div>
+                </div>
+                <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:0.82rem;font-weight:700;">Quantity:</span>
+                        <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.9rem;" onclick="stepPhotoQty(-1)">−</button>
+                        <span id="photoMatchQtyDisplay" style="font-weight:800;min-width:24px;text-align:center;">1</span>
+                        <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.9rem;" onclick="stepPhotoQty(1)">+</button>
+                    </div>
+                    <button id="btnConfirmPhotoAdd" class="btn btn-primary" type="button" onclick="confirmAddPhotoProduct()" style="padding:10px 18px;font-weight:800;">
+                        🛒 Add to Cart
+                    </button>
+                </div>
+            </div>
+
+            <!-- Multiple Ambiguous Candidates Grid -->
+            <div id="photoCandidateGrid" style="display:none;margin-bottom:var(--space-md);">
+                <div style="font-weight:700;font-size:0.9rem;color:var(--text-main);margin-bottom:8px;">
+                    Matching Catalog Candidates (Click to choose):
+                </div>
+                <div id="photoCandidatesList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closePhotoCartModal()">Close</button>
         </div>
     </div>
 </div>
 
 <!-- Voice Smart Cart Modal Fragment -->
-<div th:fragment="voiceBillingModal" id="voiceBillingModal" class="modal-backdrop" role="dialog" aria-modal="true">
-    <div class="modal-card" style="max-width: 520px;">
+<div th:fragment="voiceBillingModal" id="voiceBillingModal" class="modal-backdrop" role="dialog" aria-modal="true" style="z-index:95;">
+    <div class="modal-card" style="max-width: 560px; max-height: 92vh; display:flex; flex-direction:column;">
         <div class="modal-header">
-            <h3 class="modal-title">Voice Smart Cart</h3>
+            <h3 class="modal-title">🎤 Voice Smart Cart</h3>
             <button class="modal-close-btn" type="button" aria-label="Close" onclick="closeVoiceBillingModal()">&times;</button>
         </div>
-        <div class="modal-body" style="text-align:center;">
-            <div id="voiceStatusText" role="status" aria-live="polite" style="font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:var(--space-md);">Speak a catalog command or type one below.</div>
-            <div style="margin:var(--space-md) 0;">
-                <button id="btnMicTrigger" class="btn btn-primary" type="button" aria-label="Start voice recognition" aria-pressed="false" title="Start voice recognition" onclick="toggleVoiceRecording()">
-                    🎙️ Speak
-                </button>
-            </div>
-            <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-md);">
-                Try “add two packets of milk”, “search for rice”, or “show my cart”.<br>
-                Speech uses your browser recognition service. Audio is not recorded by FreshLedger.
+        <div class="modal-body" style="overflow-y:auto; padding:var(--space-lg); text-align:center;">
+            <div id="voiceStatusText" style="font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:var(--space-sm);">
+                Speak or type your grocery shopping command
             </div>
 
-            <div class="form-group" style="text-align:left;">
-                <label class="form-label" for="voiceTranscriptInput">Spoken or typed command</label>
-                <input id="voiceTranscriptInput" class="form-control" autocomplete="off" placeholder="Add two packets of milk" />
+            <!-- Big Microphone Button -->
+            <div style="margin:var(--space-md) 0;">
+                <button id="btnMicTrigger" class="btn btn-primary" type="button"
+                        style="width:84px;height:84px;border-radius:50%;font-size:2.2rem;box-shadow:var(--shadow-lg);transition:all 0.2s;"
+                        onclick="toggleVoiceRecording()" title="Click to start/stop speaking">
+                    🎙️
+                </button>
             </div>
-            <div id="voiceCommandResults" style="display:flex;flex-direction:column;gap:8px;text-align:left;"></div>
+
+            <div id="speechEngineBadge" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:var(--space-sm);">
+                Supports browser speech recognition & typed shopping commands (English, Hindi, Kannada).
+            </div>
+
+            <!-- Typed / Speech Transcript Input -->
+            <div class="form-group" style="text-align:left;margin-top:var(--space-md);">
+                <label class="form-label" for="voiceTranscriptInput" style="display:flex;justify-content:space-between;">
+                    <span>Shopping Command (Spoken or Typed)</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">Press Enter to run</span>
+                </label>
+                <div style="display:flex;gap:8px;">
+                    <input id="voiceTranscriptInput" class="form-control"
+                           placeholder="e.g. 'Add two packets of Amul milk' or 'Search for rice'"
+                           onkeydown="if(event.key === 'Enter') { event.preventDefault(); processVoiceTranscriptToCart(); }" />
+                    <button id="btnRunVoiceCommand" class="btn btn-primary" type="button" onclick="processVoiceTranscriptToCart()" style="white-space:nowrap;padding:10px 16px;">
+                        ▶ Run
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Example Command Chips -->
+            <div style="text-align:left;margin-top:var(--space-md);">
+                <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:6px;">QUICK TRY COMMANDS:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Add two packets of Amul milk')">Add two packets of Amul milk</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Add one kilogram of sugar')">Add one kilogram of sugar</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Add three Maggi packets')">Add three Maggi packets</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Search for rice')">Search for rice</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Add Amul Butter')">Add Amul Butter</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Remove Amul Butter')">Remove Amul Butter</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Increase milk quantity to three')">Increase milk quantity to three</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Show my cart')">Show my cart</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('What is my total bill?')">What is my total bill?</button>
+                    <button class="pill-btn" type="button" onclick="applyQuickVoiceCommand('Clear my cart')">Clear my cart</button>
+                </div>
+            </div>
+
+            <!-- Execution Status & Feedback -->
+            <div id="voiceExecutionFeedback" style="display:none;text-align:left;margin-top:var(--space-md);"></div>
+
+            <!-- Ambiguity Selection List -->
+            <div id="voiceAmbiguityContainer" style="display:none;text-align:left;margin-top:var(--space-md);background:var(--bg-app);padding:10px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);">
+                <div style="font-weight:700;font-size:0.85rem;color:var(--text-main);margin-bottom:6px;">Select matching product:</div>
+                <div id="voiceCandidatesList" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;"></div>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" type="button" onclick="closeVoiceBillingModal()">Cancel</button>
-            <button class="btn btn-primary" type="button" onclick="processVoiceTranscriptToCart()">Run command</button>
+            <button class="btn btn-primary" type="button" onclick="processVoiceTranscriptToCart()">Execute Command</button>
         </div>
     </div>
 </div>

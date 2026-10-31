@@ -16,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
+import org.springframework.core.annotation.Order;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -26,6 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @Profile("prod")
 @ConditionalOnProperty(name = "app.migration.h2-to-postgres.enabled", havingValue = "true")
+@DependsOnDatabaseInitialization
+@Order(1)
 public class H2ToPostgresMigrationRunner implements ApplicationRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(H2ToPostgresMigrationRunner.class);
     private static final int BATCH_SIZE = 500;

@@ -3,13 +3,17 @@ package com.billingsystem.billing_system;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
 @Profile("prod")
+@DependsOnDatabaseInitialization
+@Order(2)
 public class ProductionOwnerBootstrapper implements CommandLineRunner {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
@@ -23,8 +27,8 @@ public class ProductionOwnerBootstrapper implements CommandLineRunner {
             @Value("${app.auth.bootstrap-owner-email:}") String bootstrapEmail) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
-        this.bootstrapPassword = bootstrapPassword;
-        this.bootstrapEmail = bootstrapEmail;
+        this.bootstrapPassword = bootstrapPassword != null ? bootstrapPassword : "";
+        this.bootstrapEmail = bootstrapEmail != null ? bootstrapEmail.trim() : "";
     }
 
     @Override
@@ -44,13 +48,10 @@ public class ProductionOwnerBootstrapper implements CommandLineRunner {
             throw new IllegalStateException(
                     "Set APP_BOOTSTRAP_OWNER_PASSWORD (12 to 72 UTF-8 bytes) to create the initial production owner.");
         }
-        String email = bootstrapEmail.trim().toLowerCase();
-        if (!email.isEmpty() && (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") || email.length() > 254)) {
-            throw new IllegalStateException("APP_BOOTSTRAP_OWNER_EMAIL must be a valid email address.");
-        }
+        String email = !bootstrapEmail.isBlank() ? bootstrapEmail : null;
         jdbc.update("""
                 INSERT INTO app_users (username, password_hash, role, display_name, email, enabled)
                 VALUES ('owner', ?, 'OWNER', 'Store Owner', ?, TRUE)
-                """, passwordEncoder.encode(bootstrapPassword), email.isEmpty() ? null : email);
+                """, passwordEncoder.encode(bootstrapPassword), email);
     }
 }

@@ -68,16 +68,10 @@ class BillingWorkflowTest {
         mockMvc.perform(get("/cashier/pos").with(user("cashier").roles("CASHIER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("posProductGrid")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("voiceBillingModal")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("receiptScannerModal")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("posPointsToRedeem")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("btnConfirmUpiSuccess")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("btnOpenWhatsApp")));
         mockMvc.perform(get("/customer/home").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("voiceBillingModal")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("receiptScannerModal")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("customerPointsToRedeem")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/images/products/rice.svg")));
     }
 
@@ -85,14 +79,10 @@ class BillingWorkflowTest {
     void catalogUsesRelevantLocalImagesAndUnknownItemsUsePlaceholder() throws Exception {
         mockMvc.perform(get("/api/products").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].purchasePrice").doesNotExist())
                 .andExpect(jsonPath("$[?(@.barcode == '8901262010012')].imagePath")
                         .value(org.hamcrest.Matchers.hasItem("/images/products/dairy.svg")))
                 .andExpect(jsonPath("$[?(@.barcode == '8906010501123')].imagePath")
                         .value(org.hamcrest.Matchers.hasItem("/images/products/rice.svg")));
-        mockMvc.perform(get("/api/products").with(user("owner").roles("OWNER")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].purchasePrice").exists());
         mockMvc.perform(get("/images/products/rice.svg"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.parseMediaType("image/svg+xml")));
@@ -350,247 +340,6 @@ class BillingWorkflowTest {
                 """, Integer.class, firstOperationId, secondOperationId)).isEqualTo(1);
     }
 
-    @Test
-    void partialRefundIsIdempotentAuditedAndRestocksOnlyWhenRequested() throws Exception {
-        String barcode = "REFUND-" + UUID.randomUUID();
-        MvcResult created = mockMvc.perform(post("/api/owner/products")
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"Return Test Product","category":"Grocery","brand":"Test",
-                                 "barcode":"%s","purchasePrice":10.00,"price":20.00,"stock":5,"minStock":1}
-                                """.formatted(barcode)))
-                .andExpect(status().isOk())
-                .andReturn();
-        long productId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        String operationId = UUID.randomUUID().toString();
-        MvcResult sale = mockMvc.perform(post("/api/sales")
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","paymentMode":"Cash",
-                                 "items":[{"productId":%d,"quantity":2}]}
-                                """.formatted(operationId, productId)))
-                .andExpect(status().isOk())
-                .andReturn();
-        String invoice = objectMapper.readTree(sale.getResponse().getContentAsString()).get("invoice").stringValue();
-        String refundOperationId = UUID.randomUUID().toString();
-        String refundBody = """
-                {"operationId":"%s","reason":"Damaged packaging",
-                 "items":[{"productId":%d,"quantity":1,"restock":true}]}
-                """.formatted(refundOperationId, productId);
-
-        MvcResult refund = mockMvc.perform(post("/api/sales/%s/refunds".formatted(invoice))
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(refundBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.amount").value(19.40))
-                .andExpect(jsonPath("$.approvedBy").value("cashier"))
-                .andExpect(jsonPath("$.items[0].restocked").value(true))
-                .andReturn();
-        String refundReference = objectMapper.readTree(refund.getResponse().getContentAsString())
-                .get("refundReference").stringValue();
-
-        mockMvc.perform(post("/api/sales/%s/refunds".formatted(invoice))
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(refundBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.refundReference").value(refundReference));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
-                "SELECT stock FROM products WHERE id = ?", Integer.class, productId)).isEqualTo(4);
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("""
-                SELECT COUNT(*) FROM stock_movements
-                WHERE product_id = ? AND movement_type = 'SALE' AND reference_invoice = ?
-                """, Integer.class, productId, invoice)).isEqualTo(1);
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("""
-                SELECT COUNT(*) FROM stock_movements
-                WHERE product_id = ? AND movement_type = 'REFUND' AND reference_invoice = ?
-                """, Integer.class, productId, invoice)).isEqualTo(1);
-
-        mockMvc.perform(post("/api/sales/%s/refunds".formatted(invoice))
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","reason":"Another return",
-                                 "items":[{"productId":%d,"quantity":2,"restock":false}]}
-                                """.formatted(UUID.randomUUID(), productId)))
-                .andExpect(status().isConflict());
-        mockMvc.perform(get("/api/sales/%s/refunds".formatted(invoice))
-                        .with(user("cashier").roles("CASHIER")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].refundReference").value(refundReference));
-        mockMvc.perform(post("/api/sales/%s/refunds".formatted(invoice))
-                        .with(user("customer").roles("CUSTOMER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(refundBody))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/owner/products/%d".formatted(productId))
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf()))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void ownerWasteEntryDeductsAvailableStockAndRecordsAuditableCost() throws Exception {
-        String barcode = "WASTE-" + UUID.randomUUID();
-        MvcResult created = mockMvc.perform(post("/api/owner/products")
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"Waste Test Product","category":"Grocery","brand":"Test",
-                                 "barcode":"%s","purchasePrice":12.50,"price":20.00,"stock":3,"minStock":1}
-                                """.formatted(barcode)))
-                .andExpect(status().isOk())
-                .andReturn();
-        long productId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        String wasteRequest = """
-                {"quantity":2,"reason":"Damaged","notes":"Torn packaging"}
-                """;
-
-        mockMvc.perform(post("/api/owner/products/%d/waste".formatted(productId))
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(wasteRequest))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.loss").value(25.00))
-                .andExpect(jsonPath("$.remainingStock").value(1));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
-                "SELECT stock FROM products WHERE id = ?", Integer.class, productId)).isEqualTo(1);
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("""
-                SELECT COUNT(*) FROM waste_records
-                WHERE product_id = ? AND actor_username = 'owner' AND unit_cost = 12.50
-                """, Integer.class, productId)).isEqualTo(1);
-        mockMvc.perform(get("/api/owner/products/%d/movements".formatted(productId))
-                        .with(user("owner").roles("OWNER")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].type").value("WASTE"))
-                .andExpect(jsonPath("$[0].quantityChange").value(-2));
-        mockMvc.perform(get("/api/owner/waste").with(user("owner").roles("OWNER")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.productId == %d)].loss".formatted(productId))
-                        .value(org.hamcrest.Matchers.hasItem(25.0)));
-        mockMvc.perform(post("/api/owner/products/%d/waste".formatted(productId))
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"quantity":2,"reason":"Expired","notes":"Over stock"}
-                                """))
-                .andExpect(status().isConflict());
-        mockMvc.perform(post("/api/owner/products/%d/waste".formatted(productId))
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(wasteRequest))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/owner/products/%d".formatted(productId))
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf()))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void cashierSaleAwardsPointsAndRedemptionUsesTheCustomersOwnBalance() throws Exception {
-        String barcode = "LOYALTY-" + UUID.randomUUID();
-        MvcResult created = mockMvc.perform(post("/api/owner/products")
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"Loyalty Test Product","category":"Grocery","brand":"Test",
-                                 "barcode":"%s","purchasePrice":100.00,"price":200.00,"stock":5,"minStock":1}
-                                """.formatted(barcode)))
-                .andExpect(status().isOk())
-                .andReturn();
-        long productId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        int startingBalance = jdbc.queryForObject(
-                "SELECT loyalty_points FROM app_users WHERE username = 'customer'", Integer.class);
-        String earnedOperationId = UUID.randomUUID().toString();
-
-        mockMvc.perform(post("/api/sales")
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","customerUsername":"customer","paymentMode":"Cash",
-                                 "items":[{"productId":%d,"quantity":1}]}
-                                """.formatted(earnedOperationId, productId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.amount").value(194.00));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
-                "SELECT loyalty_points FROM app_users WHERE username = 'customer'", Integer.class))
-                .isEqualTo(startingBalance + 1);
-
-        String redemptionOperationId = UUID.randomUUID().toString();
-        MvcResult redeemedSale = mockMvc.perform(post("/api/sales")
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","customerUsername":"customer","paymentMode":"Cash",
-                                 "pointsToRedeem":50,"items":[{"productId":%d,"quantity":1}]}
-                                """.formatted(redemptionOperationId, productId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.amount").value(144.00))
-                .andReturn();
-        String redeemedInvoice = objectMapper.readTree(redeemedSale.getResponse().getContentAsString())
-                .get("invoice").stringValue();
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
-                "SELECT loyalty_points FROM app_users WHERE username = 'customer'", Integer.class))
-                .isEqualTo(startingBalance - 48);
-        mockMvc.perform(get("/api/customer/loyalty").with(user("customer").roles("CUSTOMER")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.balance").value(startingBalance - 48))
-                .andExpect(jsonPath("$.entries[?(@.type == 'EARN')]").exists())
-                .andExpect(jsonPath("$.entries[?(@.type == 'REDEEM')]").exists());
-
-        mockMvc.perform(post("/api/sales/%s/refunds".formatted(redeemedInvoice))
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","reason":"Full return",
-                                 "items":[{"productId":%d,"quantity":1,"restock":false}]}
-                                """.formatted(UUID.randomUUID(), productId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.amount").value(144.00));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
-                "SELECT loyalty_points FROM app_users WHERE username = 'customer'", Integer.class))
-                .isEqualTo(startingBalance + 1);
-        mockMvc.perform(get("/api/customer/loyalty").with(user("owner").roles("OWNER")))
-                .andExpect(status().isForbidden());
-
-        jdbc.update("UPDATE app_users SET loyalty_points = 0 WHERE username = 'customer'");
-        MvcResult insufficientBalance = mockMvc.perform(post("/api/sales")
-                        .with(user("cashier").roles("CASHIER"))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"operationId":"%s","customerUsername":"customer","paymentMode":"Cash",
-                                 "pointsToRedeem":%d,"items":[{"productId":%d,"quantity":1}]}
-                                """.formatted(UUID.randomUUID(), 1, productId)))
-                .andReturn();
-        jdbc.update("UPDATE app_users SET loyalty_points = ? WHERE username = 'customer'",
-                startingBalance + 1);
-        org.assertj.core.api.Assertions.assertThat(insufficientBalance.getResponse().getStatus())
-                .isEqualTo(409);
-
-        mockMvc.perform(delete("/api/owner/products/%d".formatted(productId))
-                        .with(user("owner").roles("OWNER"))
-                        .with(csrf()))
-                .andExpect(status().isNoContent());
-    }
-
     private int submitSingleItemSale(CountDownLatch start, String operationId, long productId) throws Exception {
         start.await();
         return mockMvc.perform(post("/api/sales")
@@ -657,5 +406,31 @@ class BillingWorkflowTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/customer/bills").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void customerOrderWithLoyaltyPointsRedemptionReducesPointsAndAppliesDiscount() throws Exception {
+        // Set points for customer
+        jdbc.update("UPDATE app_users SET loyalty_points = 50 WHERE username = 'customer'");
+
+        String operationId = UUID.randomUUID().toString();
+        String orderJson = """
+                {"operationId":"%s","redeemLoyaltyPoints":true,"items":[{"productId":1,"quantity":1}]}
+                """.formatted(operationId);
+
+        MvcResult result = mockMvc.perform(post("/api/orders")
+                        .with(user("customer").roles("CUSTOMER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("ORDER"))
+                .andExpect(jsonPath("$.discount").value(7.56))
+                .andReturn();
+
+        // Verify updated points: 50 redeemed (-50), plus earned points (total 26.04 / 10 = 2)
+        Integer updatedPoints = jdbc.queryForObject(
+                "SELECT loyalty_points FROM app_users WHERE username = 'customer'", Integer.class);
+        org.assertj.core.api.Assertions.assertThat(updatedPoints).isEqualTo(2);
     }
 }

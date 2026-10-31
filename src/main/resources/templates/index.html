@@ -319,7 +319,7 @@
                                 </div>
                                 <div style="display:flex;gap:var(--space-xs);">
                                     <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.8rem;" onclick="openVoiceBillingModal()">🎤 Voice Billing</button>
-                                    <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.8rem;" onclick="openReceiptScannerModal()">📷 Product Photo</button>
+                                    <button class="btn btn-secondary" type="button" style="padding:4px 10px;font-size:0.8rem;" onclick="openPhotoCartModal()">📷 Photo Cart</button>
                                 </div>
                             </div>
                         </div>
@@ -359,9 +359,6 @@
                             <select id="posCustomerSelect" class="form-control" onchange="onPosCustomerChange()">
                                 <!-- Dynamic Customers Dropdown -->
                             </select>
-                            <label class="form-label" for="posPointsToRedeem" style="margin-top:8px;">Redeem points (<span id="posAvailablePoints">0</span> available)</label>
-                            <input id="posPointsToRedeem" class="form-control" type="number" min="0" step="1" value="0" disabled />
-                            <small id="posRedeemValue" style="color:var(--text-muted);">No points applied</small>
                         </div>
 
                         <!-- Section 10 & 11: Shopping Pattern & Frequently Bought Together Suggestion -->
@@ -393,7 +390,6 @@
                                 <div style="font-size:0.78rem;color:var(--text-muted);">Subtotal - Discount + Tax</div>
                             </div>
                             <div id="posGrandTotal" class="total-amount">₹0.00</div>
-                            <div style="font-size:.78rem;color:var(--text-muted);">Points applied: <span id="posLoyaltyRedemption">₹0.00</span></div>
                         </div>
 
                         <div class="form-group" style="margin-bottom:var(--space-md);">
@@ -780,6 +776,9 @@
 
 <!-- Receipt Scanner Modal Fragment -->
 <div th:replace="~{fragments/components :: receiptScannerModal}"></div>
+
+<!-- Photo Smart Cart Modal Fragment -->
+<div th:replace="~{fragments/components :: photoCartModal}"></div>
 
 <!-- Voice Billing Modal Fragment -->
 <div th:replace="~{fragments/components :: voiceBillingModal}"></div>
