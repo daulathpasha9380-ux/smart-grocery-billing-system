@@ -1194,3 +1194,44 @@ html, body {
     overflow-x: auto;
   }
 }
+
+
+/* ==========================================================================
+   Print Styles for Thermal and Standard Invoices
+   ========================================================================== */
+@media print {
+  .sidebar,
+  .top-navbar,
+  .dashboard-header,
+  .pos-action-buttons,
+  .btn,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  body, .main-content, .page-wrapper {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .thermal-receipt-80mm {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    padding: 2mm !important;
+    margin: 0 auto !important;
+  }
+
+  .thermal-receipt-58mm {
+    width: 58mm !important;
+    max-width: 58mm !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 10px !important;
+    padding: 1mm !important;
+    margin: 0 auto !important;
+  }
+}

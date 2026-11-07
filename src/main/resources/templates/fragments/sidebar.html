@@ -2,9 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <aside th:fragment="sidebar(activeView)" id="sidebar" class="sidebar" aria-label="Main Navigation">
-    <a href="/" class="sidebar-brand">
-        <span class="brand-icon">+</span>
-        <span>FreshLedger</span>
+    <a href="/" class="sidebar-brand" style="display:flex; align-items:center; gap:var(--space-sm); text-decoration:none;">
+        <img th:src="@{/images/freshledger-icon.png}" src="/images/freshledger-icon.png" alt="FreshLedger Logo" style="width:34px; height:34px; object-fit:contain; border-radius:8px; background:#fff; padding:2px;" />
+        <span style="font-weight:800; font-size:1.2rem; color:#fff; letter-spacing:-0.02em;">Fresh<span style="color:#4ade80;">Ledger</span></span>
     </a>
 
     <nav class="sidebar-nav">

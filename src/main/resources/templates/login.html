@@ -10,6 +10,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" th:href="@{/images/favicon.png}" href="/images/favicon.png">
+    <link rel="apple-touch-icon" th:href="@{/images/favicon-64.png}" href="/images/favicon-64.png">
+
     <!-- Design System CSS -->
     <link rel="stylesheet" th:href="@{/css/design-system.css}" href="/css/design-system.css">
 
@@ -105,9 +109,8 @@
 
 <main class="login-shell">
     <section class="login-banner">
-        <div class="login-brand">
-            <span class="brand-icon">+</span>
-            <span>FreshLedger</span>
+        <div class="login-brand" style="display:flex; flex-direction:column; align-items:flex-start; gap:8px;">
+            <img th:src="@{/images/freshledger-logo.png}" src="/images/freshledger-logo.png" alt="FreshLedger - Smart Grocery. Simple Living." style="height:72px; width:auto; max-width:100%; object-fit:contain; background:#ffffff; border-radius:12px; padding:6px 12px; box-shadow:0 4px 14px rgba(0,0,0,0.18);" />
         </div>
         <div class="login-banner-content">
             <h1>Run your grocery store with clarity & speed.</h1>

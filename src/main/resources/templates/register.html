@@ -4,11 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Create Account | FreshLedger</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" th:href="@{/images/favicon.png}" href="/images/favicon.png">
+    <link rel="apple-touch-icon" th:href="@{/images/favicon-64.png}" href="/images/favicon-64.png">
     <link rel="stylesheet" th:href="@{/css/design-system.css}" />
 </head>
 <body>
-<main class="login-shell">
+<main class="login-shell" style="grid-template-columns: 1fr; max-width: 520px; margin: 40px auto;">
     <section class="login-form-side">
+        <div style="text-align:center; margin-bottom: 20px;">
+            <img th:src="@{/images/freshledger-logo.png}" src="/images/freshledger-logo.png" alt="FreshLedger" style="height:56px; width:auto; object-fit:contain;" />
+        </div>
         <h1 class="login-title">Create customer account</h1>
         <p class="login-subtitle">Register to shop and view your orders.</p>
         <div th:if="${registrationError}" class="badge badge-danger" th:text="${registrationError}"></div>
@@ -36,7 +42,7 @@
             </div>
             <button class="btn btn-primary btn-full btn-lg" type="submit">Create account</button>
         </form>
-        <p class="login-subtitle" style="margin-top:var(--space-md);"><a href="/login">Back to sign in</a></p>
+        <p class="login-subtitle" style="margin-top:var(--space-md); text-align:center;"><a href="/login">Already have an account? Sign in</a></p>
     </section>
 </main>
 </body>
